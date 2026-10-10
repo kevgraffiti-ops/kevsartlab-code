@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ION // OCTAGONAL FLIGHT - Silent Engine</title>
+    <style>
+        :root {
+            --bg: #030804;
+            --panel-bg: rgba(6, 18, 9, 0.92);
+            --accent: #00ff55;
+            --accent-dim: #007728;
+            --text: #d0fed8;
+            --border: rgba(0, 255, 85, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'SF Mono', 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 24px 16px;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        header h1 {
+            font-size: 20px;
+            letter-spacing: 5px;
+            color: var(--accent);
+            text-shadow: 0 0 12px var(--accent-dim);
+            font-weight: 800;
+        }
+
+        header p {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: rgba(208, 254, 216, 0.6);
+            margin-top: 4px;
+        }
+
+        .studio-container {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            justify-content: center;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        /* VIEWPORT & CANVAS BRACKETS */
+        .viewport-wrapper {
+            position: relative;
+            display: inline-block;
+            padding: 10px;
+            background: #000;
+            border: 1px solid rgba(0, 255, 85, 0.15);
+            box-shadow: 0 0 40px rgba(0, 255, 85, 0.08);
+        }
+
+        .corner-bracket {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 3px solid var(--accent);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .cb-tl {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .cb-tr {
+            top: 0;
+            right: 0;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .cb-bl {
+            bottom: 0;
+            left: 0;
+            border-right: none;
+            border-top: none;
+        }
+
+        .cb-br {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+        }
+
+        canvas {
+            display: block;
+            width: 405px;
+            height: 720px;
+            background-color: #000;
+        }
+
+        /* CONTROL PANEL */
+        .control-panel {
+            width: 380px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .panel-section-title {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #9cd5a5;
+        }
+
+        .control-label span:last-child {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 255, 85, 0.15);
+            outline: none;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .color-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .color-picker-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: #9cd5a5;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: 1px solid var(--border);
+            width: 100%;
+            height: 32px;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+        }
+
+        .btn-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        button {
+            background: rgba(0, 255, 85, 0.08);
+            color: var(--accent);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 11px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 14px var(--accent);
+        }
+
+        button.btn-export {
+            background: var(--accent);
+            color: #000;
+            padding: 14px;
+            font-size: 12px;
+            letter-spacing: 2px;
+            box-shadow: 0 0 20px rgba(0, 255, 85, 0.4);
+        }
+
+        button.btn-export:hover {
+            background: #ffffff;
+            box-shadow: 0 0 25px #ffffff;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            padding: 8px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 85, 0.2);
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>ION // OCTAGONAL FLIGHT</h1>
+        <p>1080 &times; 1920 // 8 SEC DURATION // 60 FPS SILENT ENGINE</p>
+    </header>
+
+    <div class="studio-container">
+        <div class="viewport-wrapper">
+            <div class="corner-bracket cb-tl"></div>
+            <div class="corner-bracket cb-tr"></div>
+            <div class="corner-bracket cb-bl"></div>
+            <div class="corner-bracket cb-br"></div>
+            <canvas id="stage" width="1080" height="1920"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div class="panel-section-title">Color Palette Matrix</div>
+            <div class="color-row">
+                <div class="color-picker-box">
+                    <span>Primary Glow</span>
+                    <input type="color" id="primaryColor" value="#00ff55">
+                </div>
+                <div class="color-picker-box">
+                    <span>Wall Circuit</span>
+                    <input type="color" id="circuitColor" value="#00aa38">
+                </div>
+                <div class="color-picker-box">
+                    <span>Deep Void</span>
+                    <input type="color" id="voidColor" value="#020803">
+                </div>
+            </div>
+
+            <div class="panel-section-title">Tunnel Dynamics</div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Flight Velocity (Tiers/Sec)</span>
+                    <span id="speedVal">2.2</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.5" max="6.0" step="0.1" value="2.2">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Bulkhead Tiers</span>
+                    <span id="tierVal">16</span>
+                </div>
+                <input type="range" id="tierSlider" min="8" max="28" step="1" value="16">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Axial Rotation Speed</span>
+                    <span id="rotVal">0.25</span>
+                </div>
+                <input type="range" id="rotSlider" min="-1.5" max="1.5" step="0.05" value="0.25">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Bloom & Phosphor Glow</span>
+                    <span id="glowVal">16</span>
+                </div>
+                <input type="range" id="glowSlider" min="2" max="35" step="1" value="16">
+            </div>
+
+            <div class="panel-section-title">Export & Pipeline</div>
+            <div class="btn-grid">
+                <button id="resetDefaultsBtn">Reset Config</button>
+                <button class="btn-export" id="exportBtn">Export 8s Video (Silent MP4)</button>
+            </div>
+
+            <div class="status-badge" id="statusBadge">STATUS // ENGINE READY (60 FPS)</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d');
+        const W = 1080;
+        const H = 1920;
+        const CX = W / 2;
+        const CY = H / 2;
+        const SIDES = 8;
+        const LOOP_DURATION = 8.0;
+
+        const config = {
+            primaryColor: '#00ff55',
+            circuitColor: '#00aa38',
+            voidColor: '#020803',
+            speed: 2.2,
+            tiers: 16,
+            rotSpeed: 0.25,
+            glow: 16
+        };
+
+        const CIRCUIT_PATTERNS = [
+            [{ u1: 0.2, v1: 0.1, u2: 0.2, v2: 0.9 }, { u1: 0.2, v1: 0.5, u2: 0.7, v2: 0.5 }, { u1: 0.7, v1: 0.5, u2: 0.7, v2: 0.85 }],
+            [{ u1: 0.5, v1: 0.05, u2: 0.5, v2: 0.95 }, { u1: 0.15, v1: 0.35, u2: 0.85, v2: 0.35 }],
+            [{ u1: 0.8, v1: 0.1, u2: 0.8, v2: 0.9 }, { u1: 0.3, v1: 0.7, u2: 0.8, v2: 0.7 }],
+            [{ u1: 0.3, v1: 0.2, u2: 0.3, v2: 0.6 }, { u1: 0.3, v1: 0.6, u2: 0.7, v2: 0.6 }, { u1: 0.7, v1: 0.6, u2: 0.7, v2: 0.95 }]
+        ];
+
+        function getOctagonVertex(radius, index, angleOffset) {
+            const angle = angleOffset + (index * (Math.PI * 2) / SIDES) + (Math.PI / 8);
+            return {
+                x: CX + Math.cos(angle) * radius,
+                y: CY + Math.sin(angle) * radius
+            };
+        }
+
+        function lerpPoint(p1, p2, alpha) {
+            return {
+                x: p1.x + (p2.x - p1.x) * alpha,
+                y: p1.y + (p2.y - p1.y) * alpha
+            };
+        }
+
+        function renderFrame(timeSeconds) {
+            const loopTime = timeSeconds % LOOP_DURATION;
+            const loopProgress = loopTime / LOOP_DURATION;
+
+            ctx.fillStyle = config.voidColor;
+            ctx.fillRect(0, 0, W, H);
+
+            const baseRotation = (loopTime * config.rotSpeed * Math.PI) + (loopProgress * (Math.PI * 2 / SIDES));
+
+            // 1. Radial Ribs
+            ctx.save();
+            ctx.strokeStyle = config.circuitColor;
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = config.circuitColor;
+            ctx.shadowBlur = config.glow * 0.4;
+            ctx.globalAlpha = 0.45;
+
+            const outerR = 1450;
+            for (let s = 0; s < SIDES; s++) {
+                const outerPt = getOctagonVertex(outerR, s, baseRotation);
+                ctx.beginPath();
+                ctx.moveTo(CX, CY);
+                ctx.lineTo(outerPt.x, outerPt.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 2. Bulkhead Tiers with Circuit Traces
+            const numTiers = config.tiers;
+            const speedOffset = (loopProgress * config.speed) % 1.0;
+
+            for (let i = numTiers; i >= 1; i--) {
+                const normZ = (i - speedOffset) / numTiers;
+                if (normZ <= 0.01) continue;
+
+                const depthScale = Math.pow(1 - normZ, 3.2);
+                const radius = depthScale * 1400;
+                if (radius < 4) continue;
+
+                const nextNormZ = (i + 1 - speedOffset) / numTiers;
+                const nextRadius = Math.pow(Math.max(0, 1 - nextNormZ), 3.2) * 1400;
+
+                if (nextRadius > 10 && i < numTiers) {
+                    ctx.save();
+                    ctx.strokeStyle = config.circuitColor;
+                    ctx.lineWidth = Math.max(1, 2.5 * depthScale);
+                    ctx.shadowColor = config.circuitColor;
+                    ctx.shadowBlur = config.glow * 0.5;
+                    ctx.globalAlpha = Math.min(0.85, depthScale * 1.4);
+
+                    for (let s = 0; s < SIDES; s++) {
+                        const innerP1 = getOctagonVertex(radius, s, baseRotation);
+                        const innerP2 = getOctagonVertex(radius, (s + 1) % SIDES, baseRotation);
+                        const outerP1 = getOctagonVertex(nextRadius, s, baseRotation);
+                        const outerP2 = getOctagonVertex(nextRadius, (s + 1) % SIDES, baseRotation);
+
+                        const pattern = CIRCUIT_PATTERNS[(s + i) % CIRCUIT_PATTERNS.length];
+                        for (let seg of pattern) {
+                            const u1Pt = lerpPoint(innerP1, innerP2, seg.u1);
+                            const u1Outer = lerpPoint(outerP1, outerP2, seg.u1);
+                            const start = lerpPoint(u1Pt, u1Outer, seg.v1);
+
+                            const u2Pt = lerpPoint(innerP1, innerP2, seg.u2);
+                            const u2Outer = lerpPoint(outerP1, outerP2, seg.u2);
+                            const end = lerpPoint(u2Pt, u2Outer, seg.v2);
+
+                            ctx.beginPath();
+                            ctx.moveTo(start.x, start.y);
+                            ctx.lineTo(end.x, end.y);
+                            ctx.stroke();
+                        }
+                    }
+                    ctx.restore();
+                }
+
+                ctx.save();
+                ctx.strokeStyle = config.primaryColor;
+                ctx.shadowColor = config.primaryColor;
+                ctx.shadowBlur = config.glow * (0.5 + depthScale * 0.8);
+                ctx.lineWidth = Math.max(1.8, 5.0 * depthScale);
+                ctx.globalAlpha = Math.min(1.0, 0.2 + depthScale * 1.5);
+
+                ctx.beginPath();
+                for (let s = 0; s < SIDES; s++) {
+                    const pt = getOctagonVertex(radius, s, baseRotation);
+                    if (s === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+
+                if (depthScale > 0.15) {
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+                    ctx.beginPath();
+                    for (let s = 0; s < SIDES; s++) {
+                        const pt = getOctagonVertex(radius * 0.94, s, baseRotation);
+                        if (s === 0) ctx.moveTo(pt.x, pt.y);
+                        else ctx.lineTo(pt.x, pt.y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // 3. Center Core
+            ctx.save();
+            ctx.fillStyle = config.primaryColor;
+            ctx.shadowColor = config.primaryColor;
+            ctx.shadowBlur = config.glow * 2.2;
+            ctx.beginPath();
+            ctx.arc(CX, CY, 16 + Math.sin(loopTime * 8) * 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            for (let s = 0; s < SIDES; s++) {
+                const pt = getOctagonVertex(32, s, -baseRotation * 2);
+                if (s === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+
+            // 4. HUD & Glitch
+            renderEngineHUD(loopTime, loopProgress);
+        }
+
+        function renderEngineHUD(loopTime, loopProgress) {
+            const isGlitch = (loopTime >= 5.2 && loopTime <= 5.45);
+
+            ctx.save();
+            if (isGlitch) {
+                ctx.fillStyle = 'rgba(255, 0, 50, 0.28)';
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.fillStyle = '#ff003b';
+                ctx.fillRect(0, CY - 45, W, 90);
+
+                ctx.font = '900 42px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#ff003b';
+                ctx.shadowBlur = 30;
+                ctx.fillText('⚠ ANOMALY DETECTED // FLIGHT ION-08', CX, CY + 14);
+            } else {
+                ctx.font = '700 24px monospace';
+                ctx.fillStyle = config.primaryColor;
+                ctx.shadowColor = config.primaryColor;
+                ctx.shadowBlur = 10;
+
+                ctx.textAlign = 'left';
+                ctx.fillText('CONDUIT // ION-OCTA-9', 90, 140);
+                ctx.fillText(`APPROACH // ${(loopProgress * 100).toFixed(1)}%`, 90, 175);
+
+                ctx.textAlign = 'right';
+                ctx.fillText('STATUS: LOCKED', W - 90, 140);
+                ctx.fillText('60 FPS // BUFFER 08', W - 90, 175);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(CX - 24, CY - 24, 48, 48);
+            }
+            ctx.restore();
+        }
+
+        // Animation Loop
+        let startTimestamp = performance.now();
+        function engineLoop(timestamp) {
+            const elapsedSeconds = (timestamp - startTimestamp) / 1000;
+            renderFrame(elapsedSeconds);
+            requestAnimationFrame(engineLoop);
+        }
+        requestAnimationFrame(engineLoop);
+
+        // Silent Video Export Pipeline
+        const exportBtn = document.getElementById('exportBtn');
+        const statusBadge = document.getElementById('statusBadge');
+
+        exportBtn.addEventListener('click', () => {
+            if (exportBtn.disabled) return;
+            exportBtn.disabled = true;
+
+            statusBadge.innerText = 'RECORDING 8.0s SILENT VIDEO...';
+            statusBadge.style.color = '#ffff00';
+
+            const canvasStream = canvas.captureStream(60);
+
+            const mimeType = MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')
+                ? 'video/mp4; codecs="avc1.42E01E"'
+                : MediaRecorder.isTypeSupported('video/mp4')
+                    ? 'video/mp4'
+                    : MediaRecorder.isTypeSupported('video/webm; codecs=vp9')
+                        ? 'video/webm; codecs=vp9'
+                        : 'video/webm';
+
+            const recorder = new MediaRecorder(canvasStream, {
+                mimeType,
+                videoBitsPerSecond: 25000000
+            });
+
+            const recordedChunks = [];
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            recorder.onstop = () => {
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(recordedChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ION_OCTAGONAL_SILENT_${Date.now()}.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                statusBadge.innerText = `STATUS // EXPORT FINISHED (${ext.toUpperCase()})`;
+                statusBadge.style.color = 'var(--accent)';
+                exportBtn.disabled = false;
+            };
+
+            startTimestamp = performance.now();
+            recorder.start();
+
+            setTimeout(() => {
+                recorder.stop();
+            }, LOOP_DURATION * 1000);
+        });
+
+        // Control Bindings
+        const primaryColorInput = document.getElementById('primaryColor');
+        const circuitColorInput = document.getElementById('circuitColor');
+        const voidColorInput = document.getElementById('voidColor');
+        const speedSlider = document.getElementById('speedSlider');
+        const tierSlider = document.getElementById('tierSlider');
+        const rotSlider = document.getElementById('rotSlider');
+        const glowSlider = document.getElementById('glowSlider');
+
+        primaryColorInput.addEventListener('input', e => {
+            config.primaryColor = e.target.value;
+            document.documentElement.style.setProperty('--accent', e.target.value);
+        });
+        circuitColorInput.addEventListener('input', e => config.circuitColor = e.target.value);
+        voidColorInput.addEventListener('input', e => config.voidColor = e.target.value);
+
+        speedSlider.addEventListener('input', e => {
+            config.speed = parseFloat(e.target.value);
+            document.getElementById('speedVal').innerText = config.speed.toFixed(1);
+        });
+
+        tierSlider.addEventListener('input', e => {
+            config.tiers = parseInt(e.target.value);
+            document.getElementById('tierVal').innerText = config.tiers;
+        });
+
+        rotSlider.addEventListener('input', e => {
+            config.rotSpeed = parseFloat(e.target.value);
+            document.getElementById('rotVal').innerText = config.rotSpeed.toFixed(2);
+        });
+
+        glowSlider.addEventListener('input', e => {
+            config.glow = parseInt(e.target.value);
+            document.getElementById('glowVal').innerText = config.glow;
+        });
+
+        document.getElementById('resetDefaultsBtn').addEventListener('click', () => {
+            primaryColorInput.value = '#00ff55';
+            circuitColorInput.value = '#00aa38';
+            voidColorInput.value = '#020803';
+            speedSlider.value = '2.2';
+            tierSlider.value = '16';
+            rotSlider.value = '0.25';
+            glowSlider.value = '16';
+
+            config.primaryColor = '#00ff55';
+            config.circuitColor = '#00aa38';
+            config.voidColor = '#020803';
+            config.speed = 2.2;
+            config.tiers = 16;
+            config.rotSpeed = 0.25;
+            config.glow = 16;
+
+            document.getElementById('speedVal').innerText = '2.2';
+            document.getElementById('tierVal').innerText = '16';
+            document.getElementById('rotVal').innerText = '0.25';
+            document.getElementById('glowVal').innerText = '16';
+            document.documentElement.style.setProperty('--accent', '#00ff55');
+        });
+    </script>
+</body>
+
+</html>

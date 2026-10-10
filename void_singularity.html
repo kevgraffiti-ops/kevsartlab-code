@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>The Void Singularity (Dark Ambient Loop)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        canvas {
+            max-height: 94vh;
+            aspect-ratio: 9 / 16;
+            border: 1px solid #14141e;
+            box-shadow: 0 0 60px rgba(120, 50, 255, 0.12);
+            background: #000;
+        }
+
+        /* Sleek Smoky HUD */
+        #panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(8, 8, 14, 0.88);
+            backdrop-filter: blur(12px);
+            border: 1px solid #202030;
+            border-radius: 10px;
+            padding: 16px;
+            color: #dcdce8;
+            width: 270px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        }
+
+        #panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #9d72ff;
+            text-shadow: 0 0 10px rgba(157, 114, 255, 0.5);
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            font-weight: 500;
+            color: #a0a0b5;
+        }
+
+        .control-row input[type="range"] {
+            width: 110px;
+            accent-color: #9d72ff;
+        }
+
+        .control-row input[type="color"] {
+            width: 36px;
+            height: 22px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #previewAudioBtn {
+            background: #141322;
+            color: #bca0ff;
+            border: 1px solid #4a3875;
+        }
+
+        #previewAudioBtn:hover {
+            background: #201c36;
+        }
+
+        #recBtn {
+            background: linear-gradient(135deg, #7928ca, #381a6c);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(121, 40, 202, 0.4);
+        }
+
+        #recBtn:disabled {
+            background: #222;
+            color: #666;
+            box-shadow: none;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h3>Void Singularity</h3>
+
+        <div class="control-row">
+            <label for="haloPick">Accretion Glow</label>
+            <input type="color" id="haloPick" value="#8a2be2">
+        </div>
+
+        <div class="control-row">
+            <label for="rayPick">Graviton Rays</label>
+            <input type="color" id="rayPick" value="#00b4d8">
+        </div>
+
+        <div class="control-row">
+            <label for="warpSlider">Curvature (<span id="warpVal">1.8</span>x)</label>
+            <input type="range" id="warpSlider" min="1.2" max="2.6" step="0.1" value="1.8">
+        </div>
+
+        <div class="control-row">
+            <label for="holeSlider">Event Horizon</label>
+            <input type="range" id="holeSlider" min="60" max="180" step="5" value="110">
+        </div>
+
+        <div class="btn-group">
+            <button id="previewAudioBtn">▶ Dark Ambient Drone</button>
+            <button id="recBtn">● Record 8s MP4</button>
+        </div>
+    </div>
+
+    <canvas id="c" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+
+        const haloPick = document.getElementById('haloPick');
+        const rayPick = document.getElementById('rayPick');
+        const warpSlider = document.getElementById('warpSlider');
+        const holeSlider = document.getElementById('holeSlider');
+        const warpVal = document.getElementById('warpVal');
+        const btn = document.getElementById('recBtn');
+        const previewBtn = document.getElementById('previewAudioBtn');
+
+        let haloColor = haloPick.value;
+        let rayColor = rayPick.value;
+        let warpPower = parseFloat(warpSlider.value);
+        let eventHorizonRadius = parseInt(holeSlider.value, 10);
+
+        haloPick.addEventListener('input', e => haloColor = e.target.value);
+        rayPick.addEventListener('input', e => rayColor = e.target.value);
+        warpSlider.addEventListener('input', e => {
+            warpPower = parseFloat(e.target.value);
+            warpVal.innerText = warpPower.toFixed(1);
+        });
+        holeSlider.addEventListener('input', e => {
+            eventHorizonRadius = parseInt(e.target.value, 10);
+        });
+
+        const DURATION = 8.0;
+        const CX = 1080 / 2;
+        const CY = 1920 / 2;
+
+        // Generate 420 deterministic cosmic dust particles
+        const DUST = [];
+        for (let i = 0; i < 420; i++) {
+            DUST.push({
+                baseAngle: (i * 2.39996) % (Math.PI * 2), // Golden ratio scattering
+                tierOffset: (i / 420),
+                size: 1.0 + (i % 4) * 0.8,
+                swirlSpeed: (i % 2 === 0 ? 1 : -1) * (0.4 + (i % 5) * 0.15)
+            });
+        }
+
+        function render(nowMs) {
+            const t = (nowMs / 1000) % DURATION;
+            const progress = t / DURATION; // 0.0 -> 1.0
+
+            // 1. Deep Space Pitch Black Canvas
+            ctx.fillStyle = '#010103';
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            // 2. Gravitational Background Lensing Rays
+            ctx.save();
+            const numRays = 48;
+            ctx.lineWidth = 1.2;
+            for (let i = 0; i < numRays; i++) {
+                const angle = (i * (Math.PI * 2 / numRays)) + (progress * 0.25);
+                const grad = ctx.createRadialGradient(CX, CY, eventHorizonRadius, CX, CY, 950);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(0.2, rayColor + '22');
+                grad.addColorStop(0.7, haloColor + '11');
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+                ctx.strokeStyle = grad;
+                ctx.beginPath();
+                // Subtle curve pulling toward the vortex
+                const rOuter = 1000;
+                const outerAngle = angle + (warpPower * 0.3);
+                ctx.moveTo(CX + Math.cos(angle) * (eventHorizonRadius + 10), CY + Math.sin(angle) * (eventHorizonRadius + 10));
+                ctx.quadraticCurveTo(
+                    CX + Math.cos(angle + 0.1) * 500,
+                    CY + Math.sin(angle + 0.1) * 500,
+                    CX + Math.cos(outerAngle) * rOuter,
+                    CY + Math.sin(outerAngle) * rOuter
+                );
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 3. Recursive Inward-Falling Spacetime Distortion Rings
+            const NUM_RINGS = 14;
+            for (let i = 0; i < NUM_RINGS; i++) {
+                // Inward suction progress calculation
+                const ringTier = (i - progress + NUM_RINGS) % NUM_RINGS;
+                // Exponential scale collapsing toward the event horizon
+                const radius = eventHorizonRadius + 850 * Math.pow(ringTier / NUM_RINGS, warpPower);
+
+                // Opacity envelope: fades smoothly in from outer edge, fades out at singularity edge
+                let alpha = 1.0;
+                const distFromHole = radius - eventHorizonRadius;
+                if (distFromHole < 80) {
+                    alpha = Math.max(0, distFromHole / 80);
+                } else if (radius > 800) {
+                    alpha = Math.max(0, 1.0 - (radius - 800) / 250);
+                }
+
+                if (alpha <= 0.02) continue;
+
+                ctx.save();
+                ctx.shadowColor = haloColor;
+                ctx.shadowBlur = 18 * alpha;
+
+                // Warped ellipse reflecting accretion angle
+                ctx.strokeStyle = haloColor;
+                ctx.globalAlpha = alpha * 0.55;
+                ctx.lineWidth = 1.8 + (1.0 - ringTier / NUM_RINGS) * 3;
+
+                ctx.beginPath();
+                ctx.ellipse(CX, CY, radius, radius * 0.65, -0.35 + (progress * 0.1), 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 4. Inward-Swirling Dust / Relativistic Matter
+            for (let i = 0; i < DUST.length; i++) {
+                const d = DUST[i];
+                // Swirl inward smoothly over 8 seconds
+                const dustProgress = (d.tierOffset - progress + 1.0) % 1.0;
+                const dustR = eventHorizonRadius + 820 * Math.pow(dustProgress, 1.5);
+                const curAngle = d.baseAngle + (d.swirlSpeed * (1.0 - dustProgress) * 3.5);
+
+                const px = CX + Math.cos(curAngle) * dustR;
+                const py = CY + Math.sin(curAngle) * (dustR * 0.65);
+
+                let alpha = 0.8;
+                if (dustR - eventHorizonRadius < 40) alpha = (dustR - eventHorizonRadius) / 40;
+                if (dustR > 750) alpha = Math.max(0, 1.0 - (dustR - 750) / 200);
+
+                ctx.fillStyle = (i % 3 === 0) ? '#ffffff' : rayColor;
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.fillRect(px, py, d.size, d.size);
+            }
+            ctx.globalAlpha = 1.0;
+
+            // 5. Singularity Outer Accretion Halo (Volumetric Light Ejection)
+            ctx.save();
+            const haloGrad = ctx.createRadialGradient(CX, CY, eventHorizonRadius * 0.9, CX, CY, eventHorizonRadius * 2.8);
+            haloGrad.addColorStop(0, haloColor);
+            haloGrad.addColorStop(0.35, rayColor + '55');
+            haloGrad.addColorStop(0.8, 'rgba(0, 0, 0, 0.4)');
+            haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            ctx.fillStyle = haloGrad;
+            ctx.beginPath();
+            ctx.ellipse(CX, CY, eventHorizonRadius * 2.8, eventHorizonRadius * 1.9, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 6. THE EVENT HORIZON (Absolute Black Singularity)
+            ctx.fillStyle = '#000000';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(CX, CY, eventHorizonRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Thin photon sphere boundary line
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.globalAlpha = 0.85;
+            ctx.beginPath();
+            ctx.arc(CX, CY, eventHorizonRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // DARK AMBIENT PROCEDURAL SOUND ENGINE
+        // ==========================================
+        function scheduleDarkAmbient(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.5, now);
+            master.connect(destinationNode);
+
+            // --- LAYER 1: 43Hz Subterranean Cosmic Drone ---
+            const droneOsc = audioCtx.createOscillator();
+            droneOsc.type = 'sawtooth';
+            droneOsc.frequency.setValueAtTime(43.65, now); // F0 deep root note
+
+            const droneFilter = audioCtx.createBiquadFilter();
+            droneFilter.type = 'lowpass';
+            // Slow breathing filter over 8s (opens up at second 4, returns to base at second 8)
+            droneFilter.frequency.setValueAtTime(75, now);
+            droneFilter.frequency.linearRampToValueAtTime(160, now + 4.0);
+            droneFilter.frequency.linearRampToValueAtTime(75, now + 8.0);
+
+            droneOsc.connect(droneFilter);
+            droneFilter.connect(master);
+            droneOsc.start(now);
+            droneOsc.stop(now + 8.0);
+
+            // --- LAYER 2: Binaural Theta Waves (108Hz Left, 112Hz Right = 4Hz Beat) ---
+            // Left ear channel
+            const oscL = audioCtx.createOscillator();
+            const panL = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+            oscL.type = 'sine';
+            oscL.frequency.setValueAtTime(108, now);
+            if (panL) { panL.pan.setValueAtTime(-0.8, now); oscL.connect(panL); panL.connect(master); }
+            else { oscL.connect(master); }
+            oscL.start(now);
+            oscL.stop(now + 8.0);
+
+            // Right ear channel
+            const oscR = audioCtx.createOscillator();
+            const panR = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+            oscR.type = 'sine';
+            oscR.frequency.setValueAtTime(112, now);
+            if (panR) { panR.pan.setValueAtTime(0.8, now); oscR.connect(panR); panR.connect(master); }
+            else { oscR.connect(master); }
+            oscR.start(now);
+            oscR.stop(now + 8.0);
+
+            // --- LAYER 3: Ethereal Shimmering Dark Ambient Swell ---
+            const padOsc = audioCtx.createOscillator();
+            padOsc.type = 'triangle';
+            padOsc.frequency.setValueAtTime(218.27, now); // A3 harmonic
+
+            const padFilter = audioCtx.createBiquadFilter();
+            padFilter.type = 'bandpass';
+            padFilter.Q.setValueAtTime(3.5, now);
+            padFilter.frequency.setValueAtTime(400, now);
+            padFilter.frequency.linearRampToValueAtTime(850, now + 4.0);
+            padFilter.frequency.linearRampToValueAtTime(400, now + 8.0);
+
+            const padGain = audioCtx.createGain();
+            padGain.gain.setValueAtTime(0.04, now);
+            padGain.gain.linearRampToValueAtTime(0.18, now + 4.0);
+            padGain.gain.linearRampToValueAtTime(0.04, now + 8.0);
+
+            padOsc.connect(padFilter);
+            padFilter.connect(padGain);
+            padGain.connect(master);
+
+            padOsc.start(now);
+            padOsc.stop(now + 8.0);
+        }
+
+        // --- PREVIEW TOGGLE ---
+        let previewCtx = null;
+        let previewTimer = null;
+        let isPreviewing = false;
+
+        function playLoop() {
+            if (!isPreviewing || !previewCtx) return;
+            scheduleDarkAmbient(previewCtx, previewCtx.destination);
+            previewTimer = setTimeout(playLoop, 8000);
+        }
+
+        previewBtn.addEventListener('click', async () => {
+            if (!isPreviewing) {
+                previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewCtx.resume();
+                isPreviewing = true;
+                playLoop();
+
+                previewBtn.innerText = '■ Stop Ambient Preview';
+                previewBtn.style.background = '#321422';
+                previewBtn.style.color = '#ff99b0';
+                previewBtn.style.borderColor = '#8a2b52';
+            } else {
+                isPreviewing = false;
+                clearTimeout(previewTimer);
+                if (previewCtx) previewCtx.close();
+
+                previewBtn.innerText = '▶ Dark Ambient Drone';
+                previewBtn.style.background = '#141322';
+                previewBtn.style.color = '#bca0ff';
+                previewBtn.style.borderColor = '#4a3875';
+            }
+        });
+
+        // --- RECORDER PIPELINE ---
+        btn.addEventListener('click', async () => {
+            if (isPreviewing) previewBtn.click();
+
+            btn.disabled = true;
+            btn.innerText = 'Recording (8.0s)...';
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+
+            const audioDest = audioCtx.createMediaStreamDestination();
+            const monitorNode = audioCtx.createGain();
+            monitorNode.gain.value = 1.0;
+            monitorNode.connect(audioDest);
+            monitorNode.connect(audioCtx.destination);
+
+            scheduleDarkAmbient(audioCtx, monitorNode);
+
+            const videoStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...videoStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const preferredTypes = [
+                'video/mp4;codecs=avc1,mp4a.40.2',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 30000000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                audioCtx.close();
+
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `void_singularity_8s.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                btn.disabled = false;
+                btn.innerText = '● Record 8s MP4';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), 8000);
+        });
+    </script>
+</body>
+
+</html>

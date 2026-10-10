@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Synesthesia Reactive Studio (9:16)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #020205;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        canvas {
+            max-height: 94vh;
+            aspect-ratio: 9 / 16;
+            border: 1px solid #1a1a2e;
+            box-shadow: 0 0 50px rgba(0, 240, 255, 0.2);
+            background: #000;
+        }
+
+        #panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(8, 10, 18, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid #2a2d4a;
+            border-radius: 10px;
+            padding: 16px;
+            color: #e2e8f0;
+            width: 280px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+        }
+
+        #panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #00f0ff;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .control-row input[type="range"] {
+            width: 110px;
+            accent-color: #00f0ff;
+        }
+
+        .control-row input[type="color"] {
+            width: 38px;
+            height: 22px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        #previewAudioBtn {
+            background: #0e1e2d;
+            color: #00f0ff;
+            border: 1px solid #00f0ff;
+        }
+
+        #previewAudioBtn:hover {
+            background: #16324a;
+        }
+
+        #recBtn {
+            background: linear-gradient(90deg, #00f0ff, #ff007f);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+
+        button:disabled {
+            background: #333;
+            color: #777;
+            box-shadow: none;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h3>Synesthesia Studio</h3>
+
+        <div class="control-row">
+            <label for="neonPick">Primary Neon</label>
+            <input type="color" id="neonPick" value="#00f0ff">
+        </div>
+
+        <div class="control-row">
+            <label for="sidesSlider">Shape (<span id="sidesVal">8</span> sides)</label>
+            <input type="range" id="sidesSlider" min="3" max="12" step="1" value="8">
+        </div>
+
+        <div class="control-row">
+            <label for="kickSlider">Kick Reactivity (<span id="kickVal">1.6</span>x)</label>
+            <input type="range" id="kickSlider" min="0.5" max="3.0" step="0.1" value="1.6">
+        </div>
+
+        <div class="control-row">
+            <label for="rgbSlider">RGB Glitch Split</label>
+            <input type="range" id="rgbSlider" min="0" max="30" step="2" value="16">
+        </div>
+
+        <div class="btn-group">
+            <button id="previewAudioBtn">▶ Start Live Synesthesia</button>
+            <button id="recBtn">● Record 8s MP4</button>
+        </div>
+    </div>
+
+    <canvas id="c" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+
+        const neonPick = document.getElementById('neonPick');
+        const sidesSlider = document.getElementById('sidesSlider');
+        const kickSlider = document.getElementById('kickSlider');
+        const rgbSlider = document.getElementById('rgbSlider');
+        const sidesVal = document.getElementById('sidesVal');
+        const kickVal = document.getElementById('kickVal');
+        const btn = document.getElementById('recBtn');
+        const previewBtn = document.getElementById('previewAudioBtn');
+
+        let neonColor = neonPick.value;
+        let sides = parseInt(sidesSlider.value, 10);
+        let kickImpact = parseFloat(kickSlider.value);
+        let maxRgbSplit = parseInt(rgbSlider.value, 10);
+
+        neonPick.addEventListener('input', e => neonColor = e.target.value);
+        sidesSlider.addEventListener('input', e => {
+            sides = parseInt(e.target.value, 10);
+            sidesVal.innerText = sides;
+        });
+        kickSlider.addEventListener('input', e => {
+            kickImpact = parseFloat(e.target.value);
+            kickVal.innerText = kickImpact.toFixed(1);
+        });
+        rgbSlider.addEventListener('input', e => maxRgbSplit = parseInt(e.target.value, 10));
+
+        const DURATION = 8.0;
+        const NUM_TIERS = 10;
+        const BASE_SCALE = 2.0;
+        const CX = 1080 / 2;
+        const CY = 1920 / 2;
+
+        // Sparks (Hi-Hat Particles)
+        const SPARKS = [];
+        for (let i = 0; i < 70; i++) {
+            SPARKS.push({
+                angle: Math.random() * Math.PI * 2,
+                dist: 40 + Math.random() * 600,
+                speed: 100 + Math.random() * 300,
+                size: 1 + Math.random() * 3,
+                life: Math.random()
+            });
+        }
+
+        // Audio Analysis Variables
+        let activeAnalyser = null;
+        let freqData = new Uint8Array(64);
+        let bassEnergy = 0;
+        let trebleEnergy = 0;
+
+        function drawPolygon(x, y, radius, sideCount, rotation) {
+            ctx.beginPath();
+            for (let i = 0; i < sideCount; i++) {
+                const a = rotation + (i * 2 * Math.PI / sideCount);
+                const px = x + radius * Math.cos(a);
+                const py = y + radius * Math.sin(a);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+
+        function render(nowMs) {
+            const t = (nowMs / 1000) % DURATION;
+            const progress = t / DURATION;
+            const rotationStep = (Math.PI * 2) / sides;
+            const globalRot = progress * rotationStep;
+
+            // 1. READ FFT FREQUENCY SPECTRUM FROM THE SOUND CARD
+            if (activeAnalyser) {
+                activeAnalyser.getByteFrequencyData(freqData);
+                // Sub-Bass (bins 1-3)
+                const rawBass = (freqData[1] + freqData[2] + freqData[3]) / (3 * 255);
+                bassEnergy = bassEnergy * 0.4 + rawBass * 0.6; // Quick smoothing
+
+                // Treble / Hi-Hats (bins 20-35)
+                const rawTreble = (freqData[20] + freqData[25] + freqData[30]) / (3 * 255);
+                trebleEnergy = trebleEnergy * 0.3 + rawTreble * 0.7;
+            } else {
+                bassEnergy = 0;
+                trebleEnergy = 0;
+            }
+
+            // 2. CAMERA SHAKE ON SUB-BASS HIT
+            let shakeX = 0, shakeY = 0;
+            if (bassEnergy > 0.4) {
+                shakeX = (Math.random() - 0.5) * (bassEnergy * kickImpact * 18);
+                shakeY = (Math.random() - 0.5) * (bassEnergy * kickImpact * 18);
+            }
+
+            ctx.save();
+            ctx.translate(shakeX, shakeY);
+
+            // Canvas Background (Spikes to deep navy on kick impact)
+            const bgFlash = Math.floor(bassEnergy * 25);
+            ctx.fillStyle = `rgb(${bgFlash * 0.4}, ${bgFlash * 0.2}, ${bgFlash * 0.8 + 4})`;
+            ctx.fillRect(-50, -50, 1180, 2020);
+
+            // Radial Rays
+            ctx.lineWidth = 2 + bassEnergy * 3;
+            ctx.strokeStyle = `rgba(0, 240, 255, ${0.12 + bassEnergy * 0.25})`;
+            for (let i = 0; i < sides; i++) {
+                const a = globalRot + (i * rotationStep);
+                ctx.beginPath();
+                ctx.moveTo(CX, CY);
+                ctx.lineTo(CX + 1500 * Math.cos(a), CY + 1500 * Math.sin(a));
+                ctx.stroke();
+            }
+
+            // 3. RECURSIVE TUNNEL WITH CHROMATIC ABERRATION SPLIT
+            const splitAmount = bassEnergy * maxRgbSplit;
+
+            for (let i = 0; i < NUM_TIERS; i++) {
+                const tier = i + progress;
+                // The kick expands the geometry outward
+                const kickExpansion = 1.0 + (bassEnergy * kickImpact * 0.22);
+                const radius = (18 * Math.pow(BASE_SCALE, tier)) * kickExpansion;
+
+                let alpha = 1.0;
+                if (tier < 1.8) alpha = tier / 1.8;
+                else if (radius > 700) alpha = Math.max(0, 1.0 - (radius - 700) / 500);
+
+                if (alpha <= 0.01) continue;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // --- PASS 1: RED CHROMATIC ABERRATION (Shifted Left) ---
+                if (splitAmount > 1) {
+                    ctx.strokeStyle = '#ff0055';
+                    ctx.lineWidth = 3;
+                    drawPolygon(CX - splitAmount, CY, radius, sides, globalRot);
+                    ctx.stroke();
+
+                    // --- PASS 2: CYAN ABERRATION (Shifted Right) ---
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 3;
+                    drawPolygon(CX + splitAmount, CY, radius, sides, globalRot);
+                    ctx.stroke();
+                }
+
+                // --- PASS 3: MAIN NEON GEOMETRY ---
+                ctx.shadowColor = neonColor;
+                ctx.shadowBlur = (16 + bassEnergy * 30) * alpha;
+                ctx.strokeStyle = neonColor;
+                ctx.lineWidth = (4 + tier * 0.8) + (bassEnergy * 4);
+                drawPolygon(CX, CY, radius, sides, globalRot);
+                ctx.stroke();
+
+                // Core Emission Line
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5 + (bassEnergy * 2);
+                drawPolygon(CX, CY, radius * 0.985, sides, globalRot);
+                ctx.stroke();
+
+                // Perimeter Circuit Ticks
+                ctx.strokeStyle = neonColor;
+                ctx.lineWidth = 2.5;
+                const tickCount = sides * 4;
+                for (let j = 0; j < tickCount; j++) {
+                    const a = globalRot + (j * 2 * Math.PI / tickCount);
+                    const r1 = radius * 0.93;
+                    const r2 = radius * (j % 4 === 0 ? (1.08 + bassEnergy * 0.08) : 1.03);
+                    ctx.beginPath();
+                    ctx.moveTo(CX + r1 * Math.cos(a), CY + r1 * Math.sin(a));
+                    ctx.lineTo(CX + r2 * Math.cos(a), CY + r2 * Math.sin(a));
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // 4. HI-HAT SPARK BURSTS
+            if (trebleEnergy > 0.25) {
+                ctx.fillStyle = '#ffffff';
+                for (const sp of SPARKS) {
+                    sp.dist += (sp.speed * trebleEnergy * 0.05);
+                    if (sp.dist > 800) sp.dist = 40 + Math.random() * 100;
+                    const sx = CX + Math.cos(sp.angle) * sp.dist;
+                    const sy = CY + Math.sin(sp.angle) * sp.dist;
+                    ctx.globalAlpha = Math.min(1.0, trebleEnergy * 1.5);
+                    ctx.fillRect(sx, sy, sp.size + trebleEnergy * 3, sp.size + trebleEnergy * 3);
+                }
+            }
+
+            ctx.restore();
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // 150 BPM INDUSTRIAL ENGINE + ANALYSER BUS
+        // ==========================================
+        function scheduleAudioWithAnalyser(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+
+            // 1. ANALYSER NODE (The listener bridge)
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 128;
+            analyser.smoothingTimeConstant = 0.4;
+
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.75, now);
+
+            // Route: Synths -> Analyser -> Master Gain -> Destination
+            analyser.connect(master);
+            master.connect(destinationNode);
+
+            const BEATS = 12;
+            const BEAT_DUR = 8.0 / 12; // ~0.667s per beat
+
+            // Kick Drum Buffer
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.frequency.setValueAtTime(190, t);
+                osc.frequency.exponentialRampToValueAtTime(38, t + 0.08);
+
+                gain.gain.setValueAtTime(1.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+
+                osc.connect(gain);
+                gain.connect(analyser);
+                osc.start(t);
+                osc.stop(t + 0.28);
+            }
+
+            // Crisp Open Hi-Hats
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+            const out = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR) + (BEAT_DUR / 2);
+                const src = audioCtx.createBufferSource();
+                src.buffer = noiseBuffer;
+
+                const filt = audioCtx.createBiquadFilter();
+                filt.type = 'highpass';
+                filt.frequency.setValueAtTime(8000, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.5, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+                src.connect(filt);
+                filt.connect(gain);
+                gain.connect(analyser);
+                src.start(t);
+                src.stop(t + 0.10);
+            }
+
+            // Rolling Acid Bassline
+            const SIXTEENTH = BEAT_DUR / 4;
+            const notes = [146.83, 164.81, 174.61, 220.0, 261.63];
+            for (let s = 0; s < BEATS * 4; s++) {
+                if (s % 4 === 0) continue; // Leave room for kick
+                const t = now + (s * SIXTEENTH);
+
+                // Only trigger once every 4 steps so notes drift rather than chug
+                if (s % 4 === 0) {
+                    const osc = audioCtx.createOscillator();
+                    osc.type = 'sine'; // Pure glass tone, zero buzz
+                    osc.frequency.setValueAtTime(notes[(s / 4) % notes.length], t);
+
+                    const filt = audioCtx.createBiquadFilter();
+                    filt.type = 'lowpass';
+                    filt.frequency.setValueAtTime(320, t); // Dark, muted ambient ceiling
+                    filt.Q.setValueAtTime(0.5, t);
+
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.0001, t);
+                    gain.gain.linearRampToValueAtTime(0.05, t + 0.3); // Slow, soft swell
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2); // Fades into space
+
+                    osc.connect(filt);
+                    filt.connect(gain);
+                    gain.connect(analyser);
+
+                    osc.start(t);
+                    osc.stop(t + 1.25);
+                }
+            }
+
+            return analyser;
+        }
+
+        // --- PREVIEW AUDIO (LIVE SYNESTHESIA) ---
+        let previewCtx = null;
+        let previewTimer = null;
+        let isPreviewing = false;
+
+        function playLoop() {
+            if (!isPreviewing || !previewCtx) return;
+            activeAnalyser = scheduleAudioWithAnalyser(previewCtx, previewCtx.destination);
+            previewTimer = setTimeout(playLoop, 8000);
+        }
+
+        previewBtn.addEventListener('click', async () => {
+            if (!isPreviewing) {
+                previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewCtx.resume();
+                isPreviewing = true;
+                playLoop();
+
+                previewBtn.innerText = '■ Stop Synesthesia';
+                previewBtn.style.background = '#350f1f';
+                previewBtn.style.color = '#ff6b8b';
+                previewBtn.style.borderColor = '#ff0055';
+            } else {
+                isPreviewing = false;
+                clearTimeout(previewTimer);
+                activeAnalyser = null;
+                if (previewCtx) previewCtx.close();
+
+                previewBtn.innerText = '▶ Start Live Synesthesia';
+                previewBtn.style.background = '#0e1e2d';
+                previewBtn.style.color = '#00f0ff';
+                previewBtn.style.borderColor = '#00f0ff';
+            }
+        });
+
+        // --- RECORD BUTTON ---
+        btn.addEventListener('click', async () => {
+            if (isPreviewing) previewBtn.click();
+
+            btn.disabled = true;
+            btn.innerText = 'Recording (8.0s)...';
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+
+            const audioDest = audioCtx.createMediaStreamDestination();
+            const monitorNode = audioCtx.createGain();
+            monitorNode.gain.value = 1.0;
+            monitorNode.connect(audioDest);
+            monitorNode.connect(audioCtx.destination);
+
+            activeAnalyser = scheduleAudioWithAnalyser(audioCtx, monitorNode);
+
+            const videoStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...videoStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const preferredTypes = [
+                'video/mp4;codecs=avc1,mp4a.40.2',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 30000000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                activeAnalyser = null;
+                audioCtx.close();
+
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `synesthesia_reactive_tunnel_8s.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                btn.disabled = false;
+                btn.innerText = '● Record 8s MP4';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), 8000);
+        });
+    </script>
+</body>
+
+</html>

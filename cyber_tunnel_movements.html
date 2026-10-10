@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Industrial Cyber-Tunnel Studio (9:16)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #020502;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        canvas {
+            max-height: 94vh;
+            aspect-ratio: 9 / 16;
+            border: 1px solid #003311;
+            box-shadow: 0 0 50px rgba(0, 255, 65, 0.2);
+            background: #000;
+        }
+
+        #panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(4, 12, 6, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid #14471e;
+            border-radius: 10px;
+            padding: 16px;
+            color: #d1f7d6;
+            width: 280px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
+        }
+
+        #panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #00ff41;
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.6);
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            font-weight: 600;
+            color: #82b88c;
+        }
+
+        .control-row input[type="range"] {
+            width: 110px;
+            accent-color: #00ff41;
+        }
+
+        .control-row input[type="color"] {
+            width: 38px;
+            height: 22px;
+            border: 1px solid #1f4d27;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        #previewAudioBtn {
+            background: #08210f;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+        }
+
+        #previewAudioBtn:hover {
+            background: #0f361a;
+        }
+
+        #recBtn {
+            background: linear-gradient(90deg, #00ff41, #008f11);
+            color: #000;
+            font-weight: 900;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        }
+
+        button:disabled {
+            background: #222;
+            color: #666;
+            box-shadow: none;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h3>Cyber-Tunnel Studio</h3>
+
+        <div class="control-row">
+            <label for="neonPick">Conduit Neon</label>
+            <input type="color" id="neonPick" value="#00ff41">
+        </div>
+
+        <div class="control-row">
+            <label for="sidesSlider">Shape (<span id="sidesVal">8</span> sides)</label>
+            <input type="range" id="sidesSlider" min="3" max="12" step="1" value="8">
+        </div>
+
+        <div class="control-row">
+            <label for="detailSlider">Circuit Density</label>
+            <input type="range" id="detailSlider" min="2" max="6" step="1" value="4">
+        </div>
+
+        <div class="btn-group">
+            <button id="previewAudioBtn">▶ Play 150 BPM Industrial</button>
+            <button id="recBtn">● Record 8s MP4</button>
+        </div>
+    </div>
+
+    <canvas id="c" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+
+        const neonPick = document.getElementById('neonPick');
+        const sidesSlider = document.getElementById('sidesSlider');
+        const detailSlider = document.getElementById('detailSlider');
+        const sidesVal = document.getElementById('sidesVal');
+        const btn = document.getElementById('recBtn');
+        const previewBtn = document.getElementById('previewAudioBtn');
+
+        let neonColor = neonPick.value;
+        let sides = parseInt(sidesSlider.value, 10);
+        let circuitDensity = parseInt(detailSlider.value, 10);
+
+        neonPick.addEventListener('input', e => neonColor = e.target.value);
+        sidesSlider.addEventListener('input', e => {
+            sides = parseInt(e.target.value, 10);
+            sidesVal.innerText = sides;
+        });
+        detailSlider.addEventListener('input', e => {
+            circuitDensity = parseInt(e.target.value, 10);
+        });
+
+        const DURATION = 8.0;
+        const NUM_TIERS = 10;
+        const BASE_SCALE = 2.0;
+        const CX = 1080 / 2;
+        const CY = 1920 / 2;
+
+        function drawPolygon(x, y, radius, sideCount, rotation) {
+            ctx.beginPath();
+            for (let i = 0; i < sideCount; i++) {
+                const a = rotation + (i * 2 * Math.PI / sideCount);
+                const px = x + radius * Math.cos(a);
+                const py = y + radius * Math.sin(a);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+
+        function render(nowMs) {
+            const t = (nowMs / 1000) % DURATION;
+            const progress = t / DURATION;
+            const rotationStep = (Math.PI * 2) / sides;
+            const globalRot = progress * rotationStep;
+
+            // Pitch Black Background
+            ctx.fillStyle = '#010502';
+            ctx.fillRect(0, 0, 1080, 1920);
+
+            // Deep Vanishing Point Glow
+            ctx.save();
+            const centerGlow = ctx.createRadialGradient(CX, CY, 5, CX, CY, 400);
+            centerGlow.addColorStop(0, 'rgba(0, 255, 65, 0.25)');
+            centerGlow.addColorStop(0.5, 'rgba(0, 255, 65, 0.05)');
+            centerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = centerGlow;
+            ctx.fillRect(0, 0, 1080, 1920);
+            ctx.restore();
+
+            // Corner Radial Conduit Rails
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = 'rgba(0, 255, 65, 0.18)';
+            for (let i = 0; i < sides; i++) {
+                const a = globalRot + (i * rotationStep);
+                ctx.beginPath();
+                ctx.moveTo(CX, CY);
+                ctx.lineTo(CX + 1600 * Math.cos(a), CY + 1600 * Math.sin(a));
+                ctx.stroke();
+
+                // Secondary mid-facet rails
+                const midA = a + (rotationStep / 2);
+                ctx.strokeStyle = 'rgba(0, 255, 65, 0.07)';
+                ctx.beginPath();
+                ctx.moveTo(CX, CY);
+                ctx.lineTo(CX + 1600 * Math.cos(midA), CY + 1600 * Math.sin(midA));
+                ctx.stroke();
+            }
+
+            // Recursive Logarithmic Conduit Tiers
+            for (let i = 0; i < NUM_TIERS; i++) {
+                const tier = i + progress;
+                const radius = 18 * Math.pow(BASE_SCALE, tier);
+
+                let alpha = 1.0;
+                if (tier < 1.8) alpha = tier / 1.8;
+                else if (radius > 720) alpha = Math.max(0, 1.0 - (radius - 720) / 480);
+
+                if (alpha <= 0.01) continue;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // 1. Heavy Outer Bulkhead Ring
+                ctx.shadowColor = neonColor;
+                ctx.shadowBlur = 18 * alpha;
+                ctx.strokeStyle = neonColor;
+                ctx.lineWidth = 4 + tier * 0.9;
+                drawPolygon(CX, CY, radius, sides, globalRot);
+                ctx.stroke();
+
+                // Core White Emission Line
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                drawPolygon(CX, CY, radius, sides, globalRot);
+                ctx.stroke();
+
+                // 2. Inner Concentric Sub-Frame
+                ctx.strokeStyle = neonColor;
+                ctx.lineWidth = 2;
+                drawPolygon(CX, CY, radius * 0.94, sides, globalRot);
+                ctx.stroke();
+
+                // 3. Notched Bulkhead Brackets & Circuit Traces
+                ctx.lineWidth = 2.5;
+                const tickCount = sides * circuitDensity;
+                for (let j = 0; j < tickCount; j++) {
+                    const a = globalRot + (j * 2 * Math.PI / tickCount);
+                    const isCorner = (j % circuitDensity === 0);
+
+                    if (isCorner) {
+                        // Structural corner tooth
+                        const r1 = radius * 0.90;
+                        const r2 = radius * 1.10;
+                        ctx.beginPath();
+                        ctx.moveTo(CX + r1 * Math.cos(a), CY + r1 * Math.sin(a));
+                        ctx.lineTo(CX + r2 * Math.cos(a), CY + r2 * Math.sin(a));
+                        ctx.stroke();
+
+                        // Corner telemetry micro-dot
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.arc(CX + r2 * Math.cos(a), CY + r2 * Math.sin(a), 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // Circuit trace step pattern (L-branch trace)
+                        const rBase = radius * 0.94;
+                        const rStep = radius * 0.82;
+                        const aOffset = a + 0.04;
+
+                        ctx.beginPath();
+                        ctx.moveTo(CX + rBase * Math.cos(a), CY + rBase * Math.sin(a));
+                        ctx.lineTo(CX + rStep * Math.cos(a), CY + rStep * Math.sin(a));
+                        ctx.lineTo(CX + rStep * Math.cos(aOffset), CY + rStep * Math.sin(aOffset));
+                        ctx.stroke();
+
+                        // Perpendicular facet ticks
+                        const rOut = radius * 1.04;
+                        ctx.beginPath();
+                        ctx.moveTo(CX + radius * Math.cos(a), CY + radius * Math.sin(a));
+                        ctx.lineTo(CX + rOut * Math.cos(a), CY + rOut * Math.sin(a));
+                        ctx.stroke();
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // 150 BPM INDUSTRIAL ENGINE
+        // ==========================================
+        function scheduleIndustrialTrack(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.72, now);
+            master.connect(destinationNode);
+
+            const BEATS = 20;       // 20 beats = 8.0s at 150 BPM
+            const BEAT_DUR = 0.40;  // 0.40s per beat
+
+            // 1. PUNCHY INDUSTRIAL SUB-KICK (4-on-the-floor)
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.frequency.setValueAtTime(185, t);
+                osc.frequency.exponentialRampToValueAtTime(38, t + 0.08);
+
+                gain.gain.setValueAtTime(1.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.30);
+            }
+
+            // 2. CRISP HIGH-FREQUENCY OPEN HI-HATS (Off-beats)
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+            const out = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR) + (BEAT_DUR / 2);
+                const src = audioCtx.createBufferSource();
+                src.buffer = noiseBuffer;
+
+                const filt = audioCtx.createBiquadFilter();
+                filt.type = 'highpass';
+                filt.frequency.setValueAtTime(7500, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.45, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+                src.connect(filt);
+                filt.connect(gain);
+                gain.connect(master);
+                src.start(t);
+                src.stop(t + 0.10);
+            }
+
+            // 3. ROLLING 16TH-NOTE INDUSTRIAL ACID BASS
+            const SIXTEENTH = BEAT_DUR / 4;
+            const notes = [55, 55, 58.27, 55, 65.41, 55, 73.42, 65.41]; // D / F / G Drive
+            for (let s = 0; s < BEATS * 4; s++) {
+                if (s % 4 === 0) continue; // Leave hole for clean kick punch
+                const t = now + (s * SIXTEENTH);
+
+                const osc = audioCtx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(notes[s % notes.length], t);
+
+                const filt = audioCtx.createBiquadFilter();
+                filt.type = 'lowpass';
+                filt.Q.setValueAtTime(5.5, t);
+                filt.frequency.setValueAtTime(550 + Math.sin(s * 0.22) * 750, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.32, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+                osc.connect(filt);
+                filt.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.09);
+            }
+        }
+
+        // --- PREVIEW TOGGLE ---
+        let previewCtx = null;
+        let previewTimer = null;
+        let isPreviewing = false;
+
+        function playLoop() {
+            if (!isPreviewing || !previewCtx) return;
+            scheduleIndustrialTrack(previewCtx, previewCtx.destination);
+            previewTimer = setTimeout(playLoop, 8000);
+        }
+
+        previewBtn.addEventListener('click', async () => {
+            if (!isPreviewing) {
+                previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewCtx.resume();
+                isPreviewing = true;
+                playLoop();
+
+                previewBtn.innerText = '■ Stop Industrial Audio';
+                previewBtn.style.background = '#290c0c';
+                previewBtn.style.color = '#ff6b6b';
+                previewBtn.style.borderColor = '#ff4444';
+            } else {
+                isPreviewing = false;
+                clearTimeout(previewTimer);
+                if (previewCtx) previewCtx.close();
+
+                previewBtn.innerText = '▶ Play 150 BPM Industrial';
+                previewBtn.style.background = '#08210f';
+                previewBtn.style.color = '#00ff41';
+                previewBtn.style.borderColor = '#00ff41';
+            }
+        });
+
+        // --- RECORD 8S MP4 BAKE ---
+        btn.addEventListener('click', async () => {
+            if (isPreviewing) previewBtn.click();
+
+            btn.disabled = true;
+            btn.innerText = 'Recording (8.0s)...';
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+
+            const audioDest = audioCtx.createMediaStreamDestination();
+            const monitorNode = audioCtx.createGain();
+            monitorNode.gain.value = 1.0;
+            monitorNode.connect(audioDest);
+            monitorNode.connect(audioCtx.destination);
+
+            scheduleIndustrialTrack(audioCtx, monitorNode);
+
+            const videoStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...videoStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const preferredTypes = [
+                'video/mp4;codecs=avc1,mp4a.40.2',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 30000000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                audioCtx.close();
+
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cyber_tunnel_green_8s.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                btn.disabled = false;
+                btn.innerText = '● Record 8s MP4';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), 8000);
+        });
+    </script>
+</body>
+
+</html>

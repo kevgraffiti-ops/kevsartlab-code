@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>BRUTALIST MONOLITH CORRIDOR // Production Engine</title>
+    <style>
+        :root {
+            --bg: #07080a;
+            --panel-bg: rgba(14, 16, 20, 0.94);
+            --accent: #ff5500;
+            --accent-glow: rgba(255, 85, 0, 0.4);
+            --concrete: #2c2f36;
+            --text: #e6e8ec;
+            --border: rgba(255, 85, 0, 0.28);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'SF Mono', 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 24px 16px;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        header h1 {
+            font-size: 20px;
+            letter-spacing: 5px;
+            color: var(--accent);
+            text-shadow: 0 0 14px var(--accent-glow);
+            font-weight: 800;
+        }
+
+        header p {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: rgba(230, 232, 236, 0.6);
+            margin-top: 4px;
+        }
+
+        .studio-container {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            justify-content: center;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        /* VIEWPORT PREVIEW */
+        .viewport-wrapper {
+            position: relative;
+            display: inline-block;
+            padding: 10px;
+            background: #000;
+            border: 1px solid rgba(255, 85, 0, 0.2);
+            box-shadow: 0 0 45px rgba(255, 85, 0, 0.1);
+        }
+
+        .corner-bracket {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 3px solid var(--accent);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .cb-tl {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .cb-tr {
+            top: 0;
+            right: 0;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .cb-bl {
+            bottom: 0;
+            left: 0;
+            border-right: none;
+            border-top: none;
+        }
+
+        .cb-br {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+        }
+
+        canvas {
+            display: block;
+            width: 405px;
+            height: 720px;
+            /* Scaled 9:16 preview */
+            background-color: #000;
+        }
+
+        /* CONTROLS */
+        .control-panel {
+            width: 380px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .panel-section-title {
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #b0b4bd;
+        }
+
+        .control-label span:last-child {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 85, 0, 0.18);
+            outline: none;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .color-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .color-picker-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            color: #b0b4bd;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: 1px solid var(--border);
+            width: 100%;
+            height: 32px;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+        }
+
+        .btn-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        button {
+            background: rgba(255, 85, 0, 0.08);
+            color: var(--accent);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            font-family: inherit;
+            font-size: 11px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 14px var(--accent);
+        }
+
+        button.btn-export {
+            background: var(--accent);
+            color: #000;
+            padding: 14px;
+            font-size: 12px;
+            letter-spacing: 2px;
+            box-shadow: 0 0 20px rgba(255, 85, 0, 0.4);
+        }
+
+        button.btn-export:hover {
+            background: #ffffff;
+            box-shadow: 0 0 25px #ffffff;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            padding: 8px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 85, 0, 0.2);
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>BRUTALIST // MONOLITH CORRIDOR</h1>
+        <p>1080 &times; 1920 // 8 SEC DURATION // 60 FPS PERSPECTIVE ENGINE</p>
+    </header>
+
+    <div class="studio-container">
+        <div class="viewport-wrapper">
+            <div class="corner-bracket cb-tl"></div>
+            <div class="corner-bracket cb-tr"></div>
+            <div class="corner-bracket cb-bl"></div>
+            <div class="corner-bracket cb-br"></div>
+            <canvas id="stage" width="1080" height="1920"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div class="panel-section-title">Material & Illumination</div>
+            <div class="color-row">
+                <div class="color-picker-box">
+                    <span>Slit Light</span>
+                    <input type="color" id="slitColor" value="#ff5500">
+                </div>
+                <div class="color-picker-box">
+                    <span>Concrete</span>
+                    <input type="color" id="concreteColor" value="#2a2e36">
+                </div>
+                <div class="color-picker-box">
+                    <span>Atmosphere</span>
+                    <input type="color" id="fogColor" value="#050608">
+                </div>
+            </div>
+
+            <div class="panel-section-title">Corridor Dynamics</div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Travel Velocity</span>
+                    <span id="speedVal">3.0</span>
+                </div>
+                <input type="range" id="speedSlider" min="1.0" max="6.0" step="0.5" value="3.0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Monolith Depth Tiers</span>
+                    <span id="tierVal">14</span>
+                </div>
+                <input type="range" id="tierSlider" min="8" max="22" step="1" value="14">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Corridor Width Span</span>
+                    <span id="widthVal">520</span>
+                </div>
+                <input type="range" id="widthSlider" min="360" max="750" step="10" value="520">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Light Slit Bloom</span>
+                    <span id="glowVal">22</span>
+                </div>
+                <input type="range" id="glowSlider" min="4" max="45" step="1" value="22">
+            </div>
+
+            <div class="panel-section-title">Export Pipeline</div>
+            <div class="btn-grid">
+                <button id="toggleAudioBtn">Preview Audio</button>
+                <button id="resetDefaultsBtn">Reset Config</button>
+                <button class="btn-export" id="exportBtn">Export 8s Video (MP4)</button>
+            </div>
+
+            <div class="status-badge" id="statusBadge">STATUS // ENGINE READY (60 FPS)</div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. ENGINE CONSTANTS & PERSPECTIVE MATRIX
+        // =========================================================================
+        const canvas = document.getElementById('stage');
+        const ctx = canvas.getContext('2d');
+        const W = 1080;
+        const H = 1920;
+        const CX = W / 2;
+        const CY = H / 2;
+        const FOV = 780; // Perspective projection focal length
+        const LOOP_DURATION = 8.0; // Exact 8.00s loop
+
+        const config = {
+            slitColor: '#ff5500',
+            concreteColor: '#2a2e36',
+            fogColor: '#050608',
+            speedMultiplier: 3.0,
+            tiers: 14,
+            spanWidth: 520,
+            glow: 22
+        };
+
+        const SEGMENT_DEPTH = 550; // Spacing along the Z-axis
+
+        // Project 3D coordinate (x, y, z) into 2D screen coordinates
+        function project(x, y, z) {
+            if (z <= 10) return null;
+            const scale = FOV / z;
+            return {
+                x: CX + x * scale,
+                y: CY + y * scale,
+                scale: scale,
+                z: z
+            };
+        }
+
+        // Hex to RGB parser for depth fog blending
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.replace('#', ''), 16);
+            return {
+                r: (bigint >> 16) & 255,
+                g: (bigint >> 8) & 255,
+                b: bigint & 255
+            };
+        }
+
+        function shadeColor(hex, factor, fogFactor, fogHex) {
+            const c = hexToRgb(hex);
+            const f = hexToRgb(fogHex);
+
+            // Light level on face
+            let r = c.r * factor;
+            let g = c.g * factor;
+            let b = c.b * factor;
+
+            // Fog interpolation (1 = full fog, 0 = no fog)
+            r = Math.round(r * (1 - fogFactor) + f.r * fogFactor);
+            g = Math.round(g * (1 - fogFactor) + f.g * fogFactor);
+            b = Math.round(b * (1 - fogFactor) + f.b * fogFactor);
+
+            return `rgb(${Math.min(255, Math.max(0, r))}, ${Math.min(255, Math.max(0, g))}, ${Math.min(255, Math.max(0, b))})`;
+        }
+
+        // =========================================================================
+        // 2. PROCEDURAL 3D RENDER LOOP
+        // =========================================================================
+        function renderFrame(timeSeconds) {
+            const loopTime = timeSeconds % LOOP_DURATION;
+            const loopProgress = loopTime / LOOP_DURATION;
+
+            // Fill background / deep fog void
+            ctx.fillStyle = config.fogColor;
+            ctx.fillRect(0, 0, W, H);
+
+            // Total distance traversed over 8 seconds must equal an integer multiple of SEGMENT_DEPTH
+            const totalCycleDistance = SEGMENT_DEPTH * config.speedMultiplier;
+            const cameraZ = loopProgress * totalCycleDistance;
+
+            // Subtle dynamic camera drift (subtle yaw and pitch)
+            const camYaw = Math.sin(loopProgress * Math.PI * 2) * 14;
+            const camPitch = Math.cos(loopProgress * Math.PI * 2) * 22;
+
+            const maxDistance = config.tiers * SEGMENT_DEPTH;
+
+            // Draw Floor & Ceiling Trench Guide Rails
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 85, 0, 0.15)';
+            ctx.lineWidth = 2.0;
+            const trenchNear = project(-config.spanWidth * 0.45, 750, 80);
+            const trenchFar = project(-config.spanWidth * 0.45, 750, maxDistance);
+            const trenchNearR = project(config.spanWidth * 0.45, 750, 80);
+            const trenchFarR = project(config.spanWidth * 0.45, 750, maxDistance);
+
+            if (trenchNear && trenchFar) {
+                ctx.beginPath();
+                ctx.moveTo(trenchNear.x, trenchNear.y);
+                ctx.lineTo(trenchFar.x, trenchFar.y);
+                ctx.moveTo(trenchNearR.x, trenchNearR.y);
+                ctx.lineTo(trenchFarR.x, trenchFarR.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Render Monolith Slabs & Lintel Beams from back to front (Painter's Algorithm)
+            for (let i = config.tiers; i >= 0; i--) {
+                // Calculate relative continuous Z
+                let zPos = (i * SEGMENT_DEPTH) - (cameraZ % SEGMENT_DEPTH);
+                if (zPos < 60) zPos += maxDistance;
+
+                const fogFactor = Math.min(1.0, Math.max(0, Math.pow(zPos / maxDistance, 1.4)));
+                const slabThickness = 120;
+                const zFront = zPos;
+                const zBack = zPos + slabThickness;
+
+                const slabHeight = 880;
+                const slabWidth = 190;
+                const corridorHalfW = config.spanWidth * 0.5;
+
+                // Render Left and Right Concrete Monolith Pairs
+                [-1, 1].forEach(side => {
+                    const xInner = (corridorHalfW * side) + (side === 1 ? 0 : -slabWidth) + camYaw;
+                    const xOuter = xInner + (side === 1 ? slabWidth : 0);
+                    const yTop = -slabHeight + camPitch;
+                    const yBottom = slabHeight + camPitch;
+
+                    // Projected vertices
+                    const p1 = project(xInner, yTop, zFront);
+                    const p2 = project(xOuter, yTop, zFront);
+                    const p3 = project(xOuter, yBottom, zFront);
+                    const p4 = project(xInner, yBottom, zFront);
+
+                    const pb1 = project(xInner, yTop, zBack);
+                    const pb4 = project(xInner, yBottom, zBack);
+
+                    if (!p1 || !p2 || !p3 || !p4 || !pb1 || !pb4) return;
+
+                    // 1. Inner Face (facing corridor center - catches slit bounce light)
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(pb1.x, pb1.y);
+                    ctx.lineTo(pb4.x, pb4.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.closePath();
+                    ctx.fillStyle = shadeColor(config.concreteColor, 1.25, fogFactor, config.fogColor);
+                    ctx.fill();
+
+                    // 2. Front Face (facing camera)
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.closePath();
+                    ctx.fillStyle = shadeColor(config.concreteColor, 0.75, fogFactor, config.fogColor);
+                    ctx.fill();
+
+                    // Monolith Outline edge
+                    ctx.strokeStyle = shadeColor(config.concreteColor, 1.5, fogFactor, config.fogColor);
+                    ctx.lineWidth = Math.max(1.0, p1.scale * 1.8);
+                    ctx.stroke();
+
+                    // 3. Glowing Vertical Slit Light on Inner Face
+                    const slitX = xInner;
+                    const slitYStart = -slabHeight * 0.7 + camPitch;
+                    const slitYEnd = slabHeight * 0.7 + camPitch;
+                    const s1 = project(slitX, slitYStart, zFront + (slabThickness * 0.45));
+                    const s2 = project(slitX, slitYEnd, zFront + (slabThickness * 0.45));
+
+                    if (s1 && s2 && fogFactor < 0.95) {
+                        ctx.save();
+                        ctx.strokeStyle = config.slitColor;
+                        ctx.shadowColor = config.slitColor;
+                        ctx.shadowBlur = config.glow * (1 - fogFactor);
+                        ctx.lineWidth = Math.max(1.8, 7.0 * s1.scale);
+                        ctx.globalAlpha = (1 - fogFactor) * 0.95;
+
+                        ctx.beginPath();
+                        ctx.moveTo(s1.x, s1.y);
+                        ctx.lineTo(s2.x, s2.y);
+                        ctx.stroke();
+
+                        // Core hot-white filament
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = Math.max(0.8, 2.2 * s1.scale);
+                        ctx.beginPath();
+                        ctx.moveTo(s1.x, s1.y);
+                        ctx.lineTo(s2.x, s2.y);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                });
+
+                // 4. Overhead Transverse Lintel Beam
+                const beamL = project(-corridorHalfW - slabWidth + camYaw, -slabHeight + camPitch, zFront);
+                const beamR = project(corridorHalfW + slabWidth + camYaw, -slabHeight + camPitch, zFront);
+                const beamL_bot = project(-corridorHalfW - slabWidth + camYaw, -slabHeight + 110 + camPitch, zFront);
+                const beamR_bot = project(corridorHalfW + slabWidth + camYaw, -slabHeight + 110 + camPitch, zFront);
+
+                if (beamL && beamR && beamL_bot && beamR_bot) {
+                    ctx.beginPath();
+                    ctx.moveTo(beamL.x, beamL.y);
+                    ctx.lineTo(beamR.x, beamR.y);
+                    ctx.lineTo(beamR_bot.x, beamR_bot.y);
+                    ctx.lineTo(beamL_bot.x, beamL_bot.y);
+                    ctx.closePath();
+                    ctx.fillStyle = shadeColor(config.concreteColor, 0.55, fogFactor, config.fogColor);
+                    ctx.fill();
+                }
+            }
+
+            // 5. In-Engine Telemetry HUD & Retention Trap
+            renderHUD(loopTime, loopProgress);
+        }
+
+        // =========================================================================
+        // 3. HUD TELEMETRY & 5.2s RETENTION HOOK
+        // =========================================================================
+        function renderHUD(loopTime, loopProgress) {
+            const isGlitch = (loopTime >= 5.20 && loopTime <= 5.45);
+
+            ctx.save();
+            if (isGlitch) {
+                // Red warning anomaly strobe
+                ctx.fillStyle = 'rgba(255, 0, 40, 0.35)';
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.fillStyle = '#ff002b';
+                ctx.fillRect(0, CY - 50, W, 100);
+
+                ctx.font = '900 40px monospace';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#ff002b';
+                ctx.shadowBlur = 32;
+                ctx.fillText('⚠ ANOMALY DETECTED // SECTOR MONOLITH-09', CX, CY + 14);
+            } else {
+                // Clean brutalist telemetry
+                ctx.font = '700 24px monospace';
+                ctx.fillStyle = config.slitColor;
+                ctx.shadowColor = config.slitColor;
+                ctx.shadowBlur = 12;
+
+                ctx.textAlign = 'left';
+                ctx.fillText('SECTOR // MONOLITH-BRUTALIST', 90, 140);
+                ctx.fillText(`TRANSIT // ${(loopProgress * 100).toFixed(1)}%`, 90, 175);
+
+                ctx.textAlign = 'right';
+                ctx.fillText('STATUS: LOCKED', W - 90, 140);
+                ctx.fillText('60 FPS // PERSPECTIVE-3D', W - 90, 175);
+
+                // Center reticle
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(CX - 22, CY - 22, 44, 44);
+            }
+            ctx.restore();
+        }
+
+        // =========================================================================
+        // 4. ANIMATION DRIVER
+        // =========================================================================
+        let startTimestamp = performance.now();
+        function engineLoop(timestamp) {
+            const elapsedSeconds = (timestamp - startTimestamp) / 1000;
+            renderFrame(elapsedSeconds);
+            requestAnimationFrame(engineLoop);
+        }
+        requestAnimationFrame(engineLoop);
+
+
+        // =========================================================================
+        // 5. PROCEDURAL DARK AMBIENT ENGINE (CINEMATIC DRONE + NOISE + GLITCH)
+        // =========================================================================
+        let previewAudioCtx = null;
+        let audioTimer = null;
+        let isAudioPlaying = false;
+
+        function buildDarkAmbientDrone(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+
+            // Master bus compressor to glue the ambient rumble together
+            const comp = audioCtx.createDynamicsCompressor();
+            comp.threshold.setValueAtTime(-18, now);
+            comp.knee.setValueAtTime(12, now);
+            comp.ratio.setValueAtTime(8, now);
+            comp.attack.setValueAtTime(0.005, now);
+            comp.release.setValueAtTime(0.2, now);
+            comp.connect(destinationNode);
+
+            // --- LAYER 1: COLOSSAL SUB-BASS DRONE (BINAURAL BEATING) ---
+            // Two pure sine waves slightly detuned (38 Hz & 39.5 Hz) create slow acoustic pulsing
+            const sub1 = audioCtx.createOscillator();
+            const sub2 = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+
+            sub1.type = 'sine';
+            sub2.type = 'sine';
+            sub1.frequency.setValueAtTime(38.0, now);
+            sub2.frequency.setValueAtTime(39.5, now);
+
+            subGain.gain.setValueAtTime(0.75, now);
+            // Dip the sub-bass at 5.2s for an acoustic "air suction / decompression" effect
+            subGain.gain.setValueAtTime(0.75, now + 5.15);
+            subGain.gain.linearRampToValueAtTime(0.02, now + 5.20);
+            subGain.gain.exponentialRampToValueAtTime(0.75, now + 5.48);
+
+            sub1.connect(subGain);
+            sub2.connect(subGain);
+            subGain.connect(comp);
+            sub1.start(now);
+            sub2.start(now);
+            sub1.stop(now + 8.0);
+            sub2.stop(now + 8.0);
+
+            // --- LAYER 2: CAVERNOUS AIR (FILTERED BROWN NOISE) ---
+            // Generates low-frequency wind rumbling through concrete corridors
+            const bufferSize = audioCtx.sampleRate * 8.0;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                data[i] = (lastOut + (0.02 * white)) / 1.02; // Brown noise integral
+                lastOut = data[i];
+                data[i] *= 3.5; // Gain compensation
+            }
+
+            const noiseSource = audioCtx.createBufferSource();
+            noiseSource.buffer = noiseBuffer;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(260, now);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.40, now);
+
+            noiseSource.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(comp);
+            noiseSource.start(now);
+            noiseSource.stop(now + 8.0);
+
+            // --- LAYER 3: COLD DYSTOPIAN TENSION SWELL ---
+            // A hollow minor ninth drone that slowly filters open over the 8 seconds
+            const chordOsc = audioCtx.createOscillator();
+            chordOsc.type = 'sawtooth';
+            chordOsc.frequency.setValueAtTime(73.42, now); // Deep D2 pitch
+
+            const chordFilter = audioCtx.createBiquadFilter();
+            chordFilter.type = 'lowpass';
+            chordFilter.Q.setValueAtTime(6.0, now);
+            chordFilter.frequency.setValueAtTime(280, now);
+            chordFilter.frequency.exponentialRampToValueAtTime(850, now + 5.0);
+            chordFilter.frequency.linearRampToValueAtTime(280, now + 8.0);
+
+            const chordGain = audioCtx.createGain();
+            chordGain.gain.setValueAtTime(0.18, now);
+
+            chordOsc.connect(chordFilter);
+            chordFilter.connect(chordGain);
+            chordGain.connect(comp);
+            chordOsc.start(now);
+            chordOsc.stop(now + 8.0);
+
+            // --- LAYER 4: RETENTION ANOMALY AT 5.2s (METALLIC SCRAPE) ---
+            const glitchTime = now + 5.20;
+            const gOsc = audioCtx.createOscillator();
+            const gFilter = audioCtx.createBiquadFilter();
+            const gGain = audioCtx.createGain();
+
+            gOsc.type = 'sawtooth';
+            gOsc.frequency.setValueAtTime(640, glitchTime);
+            gOsc.frequency.exponentialRampToValueAtTime(80, glitchTime + 0.25);
+
+            gFilter.type = 'bandpass';
+            gFilter.frequency.setValueAtTime(1400, glitchTime);
+            gFilter.Q.setValueAtTime(10.0, glitchTime);
+
+            gGain.gain.setValueAtTime(0.85, glitchTime);
+            gGain.gain.exponentialRampToValueAtTime(0.001, glitchTime + 0.25);
+
+            gOsc.connect(gFilter);
+            gFilter.connect(gGain);
+            gGain.connect(comp);
+            gOsc.start(glitchTime);
+            gOsc.stop(glitchTime + 0.25);
+        }
+
+        // Live preview transport
+        const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+        function cycleAudioPreview() {
+            if (!isAudioPlaying || !previewAudioCtx) return;
+            buildDarkAmbientDrone(previewAudioCtx, previewAudioCtx.destination);
+            audioTimer = setTimeout(cycleAudioPreview, LOOP_DURATION * 1000);
+        }
+
+        toggleAudioBtn.addEventListener('click', async () => {
+            if (!isAudioPlaying) {
+                previewAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewAudioCtx.resume();
+                isAudioPlaying = true;
+                toggleAudioBtn.innerText = 'Stop Audio';
+                toggleAudioBtn.style.background = 'var(--accent)';
+                toggleAudioBtn.style.color = '#000';
+                cycleAudioPreview();
+            } else {
+                isAudioPlaying = false;
+                clearTimeout(audioTimer);
+                if (previewAudioCtx) previewAudioCtx.close();
+                previewAudioCtx = null;
+                toggleAudioBtn.innerText = 'Preview Audio';
+                toggleAudioBtn.style.background = '';
+                toggleAudioBtn.style.color = '';
+            }
+        });
+
+
+
+        // =========================================================================
+        // 5. SILENT MP4/WEBM EXPORT PIPELINE
+        // =========================================================================
+        const exportBtn = document.getElementById('exportBtn');
+        const statusBadge = document.getElementById('statusBadge');
+
+        exportBtn.addEventListener('click', async () => {
+            if (exportBtn.disabled) return;
+            exportBtn.disabled = true;
+
+            // Stop preview if it's currently running
+            if (isAudioPlaying) toggleAudioBtn.click();
+
+            statusBadge.innerText = 'RECORDING 8.0s AUDIO + VIDEO...';
+            statusBadge.style.color = '#ffff00';
+
+            // 1. Create recording audio stream
+            const recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await recAudioCtx.resume();
+            const audioDest = recAudioCtx.createMediaStreamDestination();
+
+            // Schedule the 8-second ambient track directly into the destination
+            buildDarkAmbientDrone(recAudioCtx, audioDest);
+
+            // 2. Combine 60 FPS Canvas + Web Audio streams
+            const canvasStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const mimeType = MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')
+                ? 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
+                : MediaRecorder.isTypeSupported('video/mp4')
+                    ? 'video/mp4'
+                    : MediaRecorder.isTypeSupported('video/webm; codecs=vp9,opus')
+                        ? 'video/webm; codecs=vp9,opus'
+                        : 'video/webm';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType,
+                videoBitsPerSecond: 28000000
+            });
+
+            const recordedChunks = [];
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            recorder.onstop = () => {
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(recordedChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `BRUTALIST_AMBIENT_LOOP_${Date.now()}.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+                recAudioCtx.close();
+
+                statusBadge.innerText = `STATUS // EXPORT FINISHED (${ext.toUpperCase()})`;
+                statusBadge.style.color = 'var(--accent)';
+                exportBtn.disabled = false;
+            };
+
+            // Reset animation to frame zero for an exact loop start
+            startTimestamp = performance.now();
+            recorder.start();
+
+            setTimeout(() => {
+                recorder.stop();
+            }, LOOP_DURATION * 1000);
+        });
+
+        // =========================================================================
+        // 6. UI PARAMETER CONTROLS
+        // =========================================================================
+        const slitColorInput = document.getElementById('slitColor');
+        const concreteColorInput = document.getElementById('concreteColor');
+        const fogColorInput = document.getElementById('fogColor');
+        const speedSlider = document.getElementById('speedSlider');
+        const tierSlider = document.getElementById('tierSlider');
+        const widthSlider = document.getElementById('widthSlider');
+        const glowSlider = document.getElementById('glowSlider');
+
+        slitColorInput.addEventListener('input', e => {
+            config.slitColor = e.target.value;
+            document.documentElement.style.setProperty('--accent', e.target.value);
+        });
+        concreteColorInput.addEventListener('input', e => config.concreteColor = e.target.value);
+        fogColorInput.addEventListener('input', e => config.fogColor = e.target.value);
+
+        speedSlider.addEventListener('input', e => {
+            config.speedMultiplier = parseFloat(e.target.value);
+            document.getElementById('speedVal').innerText = config.speedMultiplier.toFixed(1);
+        });
+
+        tierSlider.addEventListener('input', e => {
+            config.tiers = parseInt(e.target.value);
+            document.getElementById('tierVal').innerText = config.tiers;
+        });
+
+        widthSlider.addEventListener('input', e => {
+            config.spanWidth = parseInt(e.target.value);
+            document.getElementById('widthVal').innerText = config.spanWidth;
+        });
+
+        glowSlider.addEventListener('input', e => {
+            config.glow = parseInt(e.target.value);
+            document.getElementById('glowVal').innerText = config.glow;
+        });
+
+        document.getElementById('resetDefaultsBtn').addEventListener('click', () => {
+            slitColorInput.value = '#ff5500';
+            concreteColorInput.value = '#2a2e36';
+            fogColorInput.value = '#050608';
+            speedSlider.value = '3.0';
+            tierSlider.value = '14';
+            widthSlider.value = '520';
+            glowSlider.value = '22';
+
+            config.slitColor = '#ff5500';
+            config.concreteColor = '#2a2e36';
+            config.fogColor = '#050608';
+            config.speedMultiplier = 3.0;
+            config.tiers = 14;
+            config.spanWidth = 520;
+            config.glow = 22;
+
+            document.getElementById('speedVal').innerText = '3.0';
+            document.getElementById('tierVal').innerText = '14';
+            document.getElementById('widthVal').innerText = '520';
+            document.getElementById('glowVal').innerText = '22';
+            document.documentElement.style.setProperty('--accent', '#ff5500');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Synthwave Outrun Studio (9:16)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #06020f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        canvas {
+            max-height: 92vh;
+            aspect-ratio: 9 / 16;
+            border: 1px solid #3d1452;
+            box-shadow: 0 0 50px rgba(255, 0, 128, 0.25);
+            background: #000;
+        }
+
+        #panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(18, 5, 32, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #792294;
+            border-radius: 10px;
+            padding: 16px;
+            color: #f7e6ff;
+            width: 280px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        #panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ff007f;
+            text-shadow: 0 0 8px #ff007f;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            font-weight: 600;
+        }
+
+        .control-row input[type="range"] {
+            width: 110px;
+            accent-color: #ff007f;
+        }
+
+        .control-row input[type="color"] {
+            width: 38px;
+            height: 24px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        #previewAudioBtn {
+            background: #340c44;
+            color: #ff77d2;
+            border: 1px solid #ff007f;
+        }
+
+        #recBtn {
+            background: linear-gradient(90deg, #ff007f, #00f0ff);
+            color: #fff;
+            box-shadow: 0 0 16px rgba(255, 0, 128, 0.5);
+        }
+
+        button:disabled {
+            background: #444;
+            color: #888;
+            box-shadow: none;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h3>Outrun Grid Studio</h3>
+
+        <div class="control-row">
+            <label for="gridPick">Grid Color</label>
+            <input type="color" id="gridPick" value="#ff007f">
+        </div>
+
+        <div class="control-row">
+            <label for="sunPick">Sun Color</label>
+            <input type="color" id="sunPick" value="#ffe600">
+        </div>
+
+        <div class="control-row">
+            <label for="horizonPick">Horizon Glow</label>
+            <input type="color" id="horizonPick" value="#00f0ff">
+        </div>
+
+        <div class="control-row">
+            <label for="speedSlider">Grid Speed (<span id="speedVal">16</span>)</label>
+            <input type="range" id="speedSlider" min="8" max="32" step="4" value="16">
+        </div>
+
+        <div class="btn-group">
+            <button id="previewAudioBtn">▶ Play 120BPM Synthwave</button>
+            <button id="recBtn">● Record 8s MP4</button>
+        </div>
+    </div>
+
+    <canvas id="c" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+
+        const gridPick = document.getElementById('gridPick');
+        const sunPick = document.getElementById('sunPick');
+        const horizonPick = document.getElementById('horizonPick');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speedVal');
+        const btn = document.getElementById('recBtn');
+        const previewBtn = document.getElementById('previewAudioBtn');
+
+        let gridColor = gridPick.value;
+        let sunColor = sunPick.value;
+        let horizonColor = horizonPick.value;
+        let gridCycles = parseInt(speedSlider.value, 10);
+
+        gridPick.addEventListener('input', e => gridColor = e.target.value);
+        sunPick.addEventListener('input', e => sunColor = e.target.value);
+        horizonPick.addEventListener('input', e => horizonColor = e.target.value);
+        speedSlider.addEventListener('input', e => {
+            gridCycles = parseInt(e.target.value, 10);
+            speedVal.innerText = gridCycles;
+        });
+
+        const DURATION = 8.0;
+        const CX = 1080 / 2;
+        const HORIZON_Y = 1060;
+
+        // Deterministic retro starfield (stable across frames)
+        const STARS = [];
+        for (let i = 0; i < 90; i++) {
+            STARS.push({
+                x: (Math.sin(i * 99) * 0.5 + 0.5) * 1080,
+                y: (Math.cos(i * 33) * 0.5 + 0.5) * (HORIZON_Y - 200),
+                size: (i % 3) + 1,
+                alpha: 0.3 + (i % 5) * 0.15
+            });
+        }
+
+        // Mountain silhouettes
+        const MOUNTAINS = [
+            { x: 0, y: HORIZON_Y }, { x: 120, y: HORIZON_Y - 140 }, { x: 260, y: HORIZON_Y - 60 },
+            { x: 420, y: HORIZON_Y - 220 }, { x: 540, y: HORIZON_Y - 120 }, { x: 680, y: HORIZON_Y - 240 },
+            { x: 840, y: HORIZON_Y - 80 }, { x: 960, y: HORIZON_Y - 180 }, { x: 1080, y: HORIZON_Y }
+        ];
+
+        function drawSun() {
+            const sunY = HORIZON_Y - 130;
+            const sunRadius = 240;
+
+            ctx.save();
+            // Sun Gradient
+            const grad = ctx.createLinearGradient(CX, sunY - sunRadius, CX, sunY + sunRadius);
+            grad.addColorStop(0, sunColor);
+            grad.addColorStop(0.6, '#ff007f');
+            grad.addColorStop(1, '#570044');
+
+            ctx.fillStyle = grad;
+            ctx.shadowColor = sunColor;
+            ctx.shadowBlur = 40;
+            ctx.beginPath();
+            ctx.arc(CX, sunY, sunRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Synthwave Blind Cutouts
+            ctx.fillStyle = '#06020f';
+            ctx.shadowBlur = 0;
+            const numStripes = 9;
+            for (let i = 0; i < numStripes; i++) {
+                const stripeY = sunY + 20 + (i * 24);
+                const stripeH = 3 + (i * 2.8);
+                ctx.fillRect(CX - sunRadius - 10, stripeY, (sunRadius * 2) + 20, stripeH);
+            }
+            ctx.restore();
+        }
+
+        function drawMountains() {
+            ctx.save();
+            ctx.fillStyle = '#0a0314';
+            ctx.strokeStyle = '#43125d';
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+            ctx.moveTo(0, HORIZON_Y);
+            for (const pt of MOUNTAINS) ctx.lineTo(pt.x, pt.y);
+            ctx.lineTo(1080, HORIZON_Y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Ridge wireframe highlight lines
+            ctx.strokeStyle = 'rgba(255, 0, 128, 0.4)';
+            ctx.lineWidth = 1.5;
+            for (let i = 1; i < MOUNTAINS.length - 1; i += 2) {
+                ctx.beginPath();
+                ctx.moveTo(MOUNTAINS[i].x, MOUNTAINS[i].y);
+                ctx.lineTo(MOUNTAINS[i].x - 60, HORIZON_Y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function render(nowMs) {
+            const t = (nowMs / 1000) % DURATION;
+            const progress = t / DURATION; // 0.0 -> 1.0
+
+            // Sky Background
+            const skyGrad = ctx.createLinearGradient(CX, 0, CX, HORIZON_Y);
+            skyGrad.addColorStop(0, '#04010a');
+            skyGrad.addColorStop(0.7, '#150524');
+            skyGrad.addColorStop(1, '#3b0647');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, 1080, HORIZON_Y);
+
+            // Stars
+            ctx.fillStyle = '#fff';
+            for (const s of STARS) {
+                ctx.globalAlpha = s.alpha;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Sun and Mountain Silhouette
+            drawSun();
+            drawMountains();
+
+            // Ground Base Fill
+            ctx.fillStyle = '#05010a';
+            ctx.fillRect(0, HORIZON_Y, 1080, 1920 - HORIZON_Y);
+
+            // --- PERSPECTIVE INFINITE GRID ---
+            // Fractional progress based on exact integer cycle count ensures 100% loop seam
+            const gridOffset = (progress * gridCycles) % 1.0;
+
+            ctx.save();
+            ctx.strokeStyle = gridColor;
+            ctx.shadowColor = gridColor;
+            ctx.shadowBlur = 12;
+
+            // 1. Horizontal Transverse Grid Lines (Moving forward exponentially)
+            const maxTiers = 28;
+            for (let i = 1; i < maxTiers; i++) {
+                const z = i - gridOffset;
+                if (z <= 0.2) continue;
+
+                // Perspective mapping
+                const y = HORIZON_Y + (600 / z);
+                if (y > 1920) continue;
+
+                // Fade out near horizon
+                const alpha = Math.min(1.0, (y - HORIZON_Y) / 180);
+                ctx.globalAlpha = alpha;
+                ctx.lineWidth = 1.5 + (y - HORIZON_Y) / 300;
+
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(1080, y);
+                ctx.stroke();
+            }
+
+            // 2. Longitudinal Grid Lines (Radiating out to bottom screen)
+            const numRays = 26;
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i <= numRays; i++) {
+                const bottomX = -300 + (i * (1680 / numRays));
+                const alpha = Math.abs(bottomX - CX) < 80 ? 0.9 : 0.6;
+                ctx.globalAlpha = alpha;
+
+                ctx.beginPath();
+                ctx.moveTo(CX, HORIZON_Y);
+                ctx.lineTo(bottomX, 1920);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Horizon Laser Glow Band
+            ctx.save();
+            const glowGrad = ctx.createLinearGradient(0, HORIZON_Y - 20, 0, HORIZON_Y + 40);
+            glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+            glowGrad.addColorStop(0.3, horizonColor);
+            glowGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+            ctx.fillStyle = glowGrad;
+            ctx.globalAlpha = 0.85;
+            ctx.fillRect(0, HORIZON_Y - 15, 1080, 30);
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // 120 BPM SYNTHWAVE AUDIO ENGINE
+        // ==========================================
+        function scheduleSynthwave(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.55, now);
+            master.connect(destinationNode);
+
+            const BEATS = 16;         // 16 beats = 8.0s at 120 BPM
+            const BEAT_DUR = 0.50;    // 60 / 120 = 0.50s per beat
+
+            // 1. PUNCHY 80s LINNDRUM-STYLE KICK (Every Beat)
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.frequency.setValueAtTime(140, t);
+                osc.frequency.exponentialRampToValueAtTime(42, t + 0.08);
+
+                gain.gain.setValueAtTime(0.9, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.30);
+            }
+
+            // 2. GATED 80s REVERB SNARE (Beats 2 and 4 of each bar)
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < output.length; i++) output[i] = Math.random() * 2 - 1;
+
+            for (let b = 1; b < BEATS; b += 2) {
+                const t = now + (b * BEAT_DUR);
+
+                // Noise Burst
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = noiseBuffer;
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.setValueAtTime(1800, t);
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.45, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(master);
+                noise.start(t);
+                noise.stop(t + 0.18);
+
+                // Body Tone
+                const tone = audioCtx.createOscillator();
+                tone.frequency.setValueAtTime(190, t);
+                const toneGain = audioCtx.createGain();
+                toneGain.gain.setValueAtTime(0.3, t);
+                toneGain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+                tone.connect(toneGain);
+                toneGain.connect(master);
+                tone.start(t);
+                tone.stop(t + 0.12);
+            }
+
+            // 3. ROLLING OCTAVE SYNTH BASS (8th Notes: Dm -> F -> C -> G)
+            const chordRoots = [73.42, 87.31, 65.41, 49.00]; // D2, F2, C2, G1
+            const EIGHTH = BEAT_DUR / 2; // 0.25s
+            for (let step = 0; step < 32; step++) {
+                const t = now + (step * EIGHTH);
+                const bar = Math.floor(step / 8);
+                const baseFreq = chordRoots[bar];
+                // Alternate lower octave on downbeat, higher octave on upbeat
+                const freq = (step % 2 === 0) ? baseFreq * 0.5 : baseFreq;
+
+                const osc = audioCtx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, t);
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(450, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.35, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.24);
+            }
+
+            // 4. LUSH ANALOG CHORD ARPEGGIO (16th Notes)
+            const SIXTEENTH = BEAT_DUR / 4; // 0.125s
+            const arpNotes = [220, 261.63, 329.63, 440, 329.63, 261.63]; // Am / Dm arpeggiated motif
+            for (let step = 0; step < 64; step++) {
+                const t = now + (step * SIXTEENTH);
+                const freq = arpNotes[step % arpNotes.length];
+
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                osc1.type = 'sawtooth';
+                osc2.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(freq, t);
+                osc2.frequency.setValueAtTime(freq, t);
+                osc1.detune.setValueAtTime(-8, t); // Chorus detune
+                osc2.detune.setValueAtTime(8, t);
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1400, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.12, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+
+                osc1.connect(filter);
+                osc2.connect(filter);
+                filter.connect(gain);
+                gain.connect(master);
+
+                osc1.start(t);
+                osc2.start(t);
+                osc1.stop(t + 0.12);
+                osc2.stop(t + 0.12);
+            }
+        }
+
+        // --- PREVIEW AUDIO TOGGLE ---
+        let previewCtx = null;
+        let previewTimer = null;
+        let isPreviewing = false;
+
+        function playLoop() {
+            if (!isPreviewing || !previewCtx) return;
+            scheduleSynthwave(previewCtx, previewCtx.destination);
+            previewTimer = setTimeout(playLoop, 8000);
+        }
+
+        previewBtn.addEventListener('click', async () => {
+            if (!isPreviewing) {
+                previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewCtx.resume();
+                isPreviewing = true;
+                playLoop();
+
+                previewBtn.innerText = '■ Stop Synthwave Preview';
+                previewBtn.style.background = '#441414';
+                previewBtn.style.color = '#ff6b6b';
+                previewBtn.style.borderColor = '#ff6b6b';
+            } else {
+                isPreviewing = false;
+                clearTimeout(previewTimer);
+                if (previewCtx) previewCtx.close();
+
+                previewBtn.innerText = '▶ Play 120BPM Synthwave';
+                previewBtn.style.background = '#340c44';
+                previewBtn.style.color = '#ff77d2';
+                previewBtn.style.borderColor = '#ff007f';
+            }
+        });
+
+        // --- RECORD BUTTON (MP4 BAKE) ---
+        btn.addEventListener('click', async () => {
+            if (isPreviewing) previewBtn.click();
+
+            btn.disabled = true;
+            btn.innerText = 'Recording (8.0s)...';
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+
+            const audioDest = audioCtx.createMediaStreamDestination();
+            const monitorNode = audioCtx.createGain();
+            monitorNode.gain.value = 1.0;
+            monitorNode.connect(audioDest);
+            monitorNode.connect(audioCtx.destination);
+
+            scheduleSynthwave(audioCtx, monitorNode);
+
+            const videoStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...videoStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const preferredTypes = [
+                'video/mp4;codecs=avc1,mp4a.40.2',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 30000000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                audioCtx.close();
+
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `synthwave_outrun_8s.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                btn.disabled = false;
+                btn.innerText = '● Record 8s MP4';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), 8000);
+        });
+    </script>
+</body>
+
+</html>

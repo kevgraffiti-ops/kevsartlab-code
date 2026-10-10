@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>City Cruising Studio (9:16)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #03010a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        canvas {
+            max-height: 94vh;
+            aspect-ratio: 9 / 16;
+            border: 1px solid #231238;
+            box-shadow: 0 0 50px rgba(121, 40, 202, 0.2);
+            background: #000;
+        }
+
+        #panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(12, 6, 20, 0.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #4a1f68;
+            border-radius: 10px;
+            padding: 16px;
+            color: #ede2ff;
+            width: 270px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        #panel h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #9d25cc;
+            text-shadow: 0 0 8px rgba(157, 37, 204, 0.5);
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            font-weight: 600;
+        }
+
+        .control-row input[type="range"] {
+            width: 110px;
+            accent-color: #9d25cc;
+        }
+
+        .control-row input[type="color"] {
+            width: 38px;
+            height: 24px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        #previewAudioBtn {
+            background: #1b072d;
+            color: #d178ff;
+            border: 1px solid #9d25cc;
+        }
+
+        #recBtn {
+            background: linear-gradient(90deg, #9d25cc, #5d02aa);
+            color: #fff;
+            box-shadow: 0 0 16px rgba(157, 37, 204, 0.5);
+        }
+
+        button:disabled {
+            background: #444;
+            color: #888;
+            box-shadow: none;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h3>City Cruising Studio</h3>
+
+        <div class="control-row">
+            <label for="cityPick">Ambient Neon</label>
+            <input type="color" id="cityPick" value="#9a3bff">
+        </div>
+
+        <div class="control-row">
+            <label for="skyPick">Sun Color</label>
+            <input type="color" id="skyPick" value="#fca311">
+        </div>
+
+        <div class="control-row">
+            <label for="speedSlider">Urban Speed (<span id="speedVal">16</span>)</label>
+            <input type="range" id="speedSlider" min="8" max="32" step="4" value="16">
+        </div>
+
+        <div class="btn-group">
+            <button id="previewAudioBtn">▶ Play 90BPM Ambient</button>
+            <button id="recBtn">● Record 8s MP4</button>
+        </div>
+    </div>
+
+    <canvas id="c" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+
+        const cityPick = document.getElementById('cityPick');
+        const skyPick = document.getElementById('skyPick');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedVal = document.getElementById('speedVal');
+        const btn = document.getElementById('recBtn');
+        const previewBtn = document.getElementById('previewAudioBtn');
+
+        let cityNeon = cityPick.value;
+        let sunColor = skyPick.value;
+        let urbanSpeed = parseInt(speedSlider.value, 10);
+
+        cityPick.addEventListener('input', e => cityNeon = e.target.value);
+        skyPick.addEventListener('input', e => sunColor = e.target.value);
+        speedSlider.addEventListener('input', e => {
+            urbanSpeed = parseInt(e.target.value, 10);
+            speedVal.innerText = urbanSpeed;
+        });
+
+        const DURATION = 8.0;
+        const CX = 1080 / 2;
+        const HORIZON_Y = 1000;
+
+        // Distant Cyber Sky Stars
+        const STARS = [];
+        for (let i = 0; i < 60; i++) {
+            STARS.push({
+                x: (Math.sin(i * 123) * 0.5 + 0.5) * 1080,
+                y: (Math.cos(i * 45) * 0.5 + 0.5) * (HORIZON_Y - 300),
+                size: (i % 2) + 1,
+                alpha: 0.2 + (i % 3) * 0.2
+            });
+        }
+
+        // Deterministic building layout on left & right sides
+        const BUILDINGS_L = [];
+        const BUILDINGS_R = [];
+        for (let i = 0; i < 22; i++) {
+            BUILDINGS_L.push({
+                h: 220 + (i % 4) * 80 + Math.sin(i) * 50,
+                w: 90 + (i % 3) * 35,
+                offset: 140 + (i % 2) * 50, // how far back from the road
+                accentType: i % 3
+            });
+            BUILDINGS_R.push({
+                h: 240 + (i % 3) * 110 + Math.cos(i) * 60,
+                w: 80 + (i % 4) * 30,
+                offset: 130 + (i % 2) * 60,
+                accentType: (i + 1) % 3
+            });
+        }
+
+        function drawDistantCity() {
+            // Massive industrial sun
+            const sunY = HORIZON_Y - 40;
+            const r = 240;
+            ctx.save();
+            const sunGrad = ctx.createLinearGradient(CX, sunY - r, CX, sunY + r);
+            sunGrad.addColorStop(0, sunColor);
+            sunGrad.addColorStop(0.5, '#7b008a');
+            sunGrad.addColorStop(1, '#1b002a');
+
+            ctx.fillStyle = sunGrad;
+            ctx.shadowColor = sunColor;
+            ctx.shadowBlur = 40;
+            ctx.beginPath();
+            ctx.arc(CX, sunY, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Blind slice bands over the cyber-sun
+            ctx.fillStyle = '#03010a';
+            ctx.shadowBlur = 0;
+            for (let i = 0; i < 8; i++) {
+                const sy = sunY + 30 + (i * 26);
+                ctx.fillRect(CX - r - 10, sy, r * 2 + 20, 2 + i * 2.8);
+            }
+            ctx.restore();
+
+            // Flat distant hazy cityscape skyline
+            ctx.fillStyle = '#060312';
+            ctx.fillRect(0, HORIZON_Y - 14, 1080, 20);
+        }
+
+        // ==========================================
+        // DRAW PERSPECTIVE CONCRETE CITY BLOCKS
+        // ==========================================
+        function drawConcreteCity(progress) {
+            // Move through virtual blocks
+            const cycleOffset = (progress * urbanSpeed) % 1.0;
+            const numVisible = 16;
+
+            ctx.save();
+
+            // Ground road / highway strip base
+            ctx.fillStyle = '#060410';
+            ctx.fillRect(0, HORIZON_Y, 1080, 1920 - HORIZON_Y);
+
+            // Loop through Z-depth layers (Horizon inward)
+            for (let i = numVisible; i >= 1; i--) {
+                const z = i - cycleOffset;
+                if (z <= 0.1) continue;
+
+                // Perspective factor
+                const scale = 500 / z;
+                const y = HORIZON_Y + scale;
+                if (y > 1940) continue;
+
+                const fade = Math.min(1.0, (y - HORIZON_Y) / 160);
+                ctx.globalAlpha = fade;
+
+                // Draw left and right concrete structural building walls (canyons)
+                const bL = BUILDINGS_L[i % BUILDINGS_L.length];
+                const bR = BUILDINGS_R[i % BUILDINGS_R.length];
+
+                // --- Left Block ---
+                const bLx = CX - (bL.offset / z) * 1.6 - (bL.w / z);
+                const bLw = (bL.w / z) * 1.5;
+                const bLh = (bL.h / z) * 1.2;
+                const bLy = y - bLh;
+
+                ctx.fillStyle = '#0a0516';
+                ctx.strokeStyle = '#220b33';
+                ctx.lineWidth = Math.max(1, 15 / z);
+                ctx.fillRect(bLx, bLy, bLw, bLh);
+                ctx.strokeRect(bLx, bLy, bLw, bLh);
+
+                // Cyber window grid on left buildings (neon violet)
+                ctx.fillStyle = cityNeon;
+                ctx.globalAlpha = fade * 0.2;
+                const cols = 2 + (i % 3);
+                const rows = 5 + (i % 4);
+                const winW = bLw / (cols * 2.2);
+                const winH = bLh / (rows * 2.2);
+                for (let r = 1; r < rows; r++) {
+                    for (let c = 1; c < cols; c++) {
+                        ctx.fillRect(bLx + c * (bLw / cols), bLy + r * (bLh / rows), winW, winH);
+                    }
+                }
+                ctx.globalAlpha = fade;
+
+                // --- Right Block ---
+                const bRx = CX + (bR.offset / z) * 1.6;
+                const bRw = (bR.w / z) * 1.5;
+                const bRh = (bR.h / z) * 1.2;
+                const bRy = y - bRh;
+
+                ctx.fillStyle = '#080312';
+                ctx.strokeStyle = '#1d0c2e';
+                ctx.fillRect(bRx, bRy, bRw, bRh);
+                ctx.strokeRect(bRx, bRy, bRw, bRh);
+
+                // Cyber windows on right buildings
+                ctx.fillStyle = cityNeon;
+                ctx.globalAlpha = fade * 0.22;
+                for (let r = 1; r < 7; r++) {
+                    for (let c = 1; c < 3; c++) {
+                        ctx.fillRect(bRx + c * (bRw / 3), bRy + r * (bRh / 8), bRw / 7, bRh / 16);
+                    }
+                }
+                ctx.globalAlpha = fade;
+
+                // --- Highways barriers & light poles on road shoulder ---
+                ctx.strokeStyle = '#38165c';
+                ctx.lineWidth = Math.max(1.5, 40 / z);
+                const roadW_Left = CX - (210 / z);
+                const roadW_Right = CX + (210 / z);
+
+                // Back barrier side wall
+                ctx.beginPath();
+                ctx.moveTo(roadW_Left, y);
+                ctx.lineTo(CX - (210 / (z + 0.15)), HORIZON_Y + (500 / (z + 0.15)));
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(roadW_Right, y);
+                ctx.lineTo(CX + (210 / (z + 0.15)), HORIZON_Y + (500 / (z + 0.15)));
+                ctx.stroke();
+
+                // Concrete overpass/barrier struts
+                ctx.fillStyle = '#110722';
+                ctx.fillRect(roadW_Left - 8, y, 16, Math.max(5, 120 / z));
+                ctx.fillRect(roadW_Right - 8, y, 16, Math.max(5, 120 / z));
+
+                // Light poles with neon yellow/orange light dots
+                const poleH = 220 / z;
+                ctx.strokeStyle = '#2b0c44';
+                ctx.lineWidth = Math.max(1, 8 / z);
+                ctx.beginPath();
+                ctx.moveTo(roadW_Left, y);
+                ctx.lineTo(roadW_Left, y - poleH);
+                ctx.lineTo(roadW_Left + (25 / z), y - poleH);
+                ctx.stroke();
+
+                ctx.fillStyle = sunColor;
+                ctx.beginPath();
+                ctx.arc(roadW_Left + (25 / z), y - poleH, Math.max(1.5, 20 / z), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // Smooth central horizon glow
+            ctx.save();
+            const glowGrad = ctx.createLinearGradient(0, HORIZON_Y - 12, 0, HORIZON_Y + 12);
+            glowGrad.addColorStop(0, 'rgba(157, 37, 204, 0)');
+            glowGrad.addColorStop(0.5, cityNeon);
+            glowGrad.addColorStop(1, 'rgba(157, 37, 204, 0)');
+            ctx.fillStyle = glowGrad;
+            ctx.globalAlpha = 0.65;
+            ctx.fillRect(0, HORIZON_Y - 10, 1080, 20);
+            ctx.restore();
+        }
+
+        // ==========================================
+        // DRAW RUGGED CYBER-HUMMER (REAR VIEW)
+        // ==========================================
+        function drawCyberHummer(nowMs, progress) {
+            // Structural rumble based on engine state
+            const rumX = Math.sin(nowMs * 0.16) * 1.2;
+            const rumY = Math.cos(nowMs * 0.18) * 1.4;
+            const shakeY = (Math.floor(progress * 12) % 2 === 0) ? Math.sin(nowMs * 0.28) * 0.6 : 0;
+
+            const driftX = Math.sin(progress * Math.PI * 2) * 18; // Slow highway sway
+
+            const x = CX + driftX + rumX;
+            const y = 1620 + rumY + shakeY;
+
+            ctx.save();
+            ctx.shadowBlur = 0;
+
+            // Heavy Ground Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(x - 220, y + 105, 440, 24);
+
+            // Massively wide rugged tire pairs (H1 / H2 style)
+            ctx.fillStyle = '#060408';
+            ctx.beginPath();
+            ctx.roundRect(x - 225, y + 20, 85, 100, 12); // Left Tire
+            ctx.roundRect(x + 140, y + 20, 85, 100, 12); // Right Tire
+            ctx.fill();
+
+            // Rugged rear differential & suspension linkage visible underneath
+            ctx.strokeStyle = '#181224';
+            ctx.lineWidth = 14;
+            ctx.beginPath();
+            ctx.moveTo(x - 170, y + 70);
+            ctx.lineTo(x + 170, y + 70);
+            ctx.stroke();
+
+            ctx.fillStyle = '#0e0a16';
+            ctx.beginPath();
+            ctx.arc(x, y + 70, 32, 0, Math.PI * 2); // Diff pumpkin
+            ctx.fill();
+
+            // Exhaust Backfire and Thick Smoke (glowing particle cloud)
+            const exL_x = x - 130, exR_x = x + 130, ex_y = y + 80;
+            const f1 = ctx.createRadialGradient(exL_x, ex_y, 4, exL_x, ex_y, 40);
+            f1.addColorStop(0, '#fca311');
+            f1.addColorStop(0.3, 'rgba(123,0,138,0.7)');
+            f1.addColorStop(1, 'rgba(0,0,0,0)');
+
+            ctx.fillStyle = f1;
+            ctx.beginPath(); ctx.arc(exL_x, ex_y, 25 + Math.random() * 12, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(exR_x, ex_y, 25 + Math.random() * 12, 0, Math.PI * 2); ctx.fill();
+
+            // LOWER BUMPER / BULKY SKID PLATE
+            ctx.fillStyle = '#100c17';
+            ctx.strokeStyle = '#2b1a3d';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(x - 210, y + 30, 420, 44, 8);
+            ctx.fill();
+            ctx.stroke();
+
+            // Heavy D-Rings on bumper
+            ctx.strokeStyle = '#5d377c';
+            ctx.lineWidth = 3.5;
+            ctx.strokeRect(x - 150, y + 42, 12, 16);
+            ctx.strokeRect(x + 138, y + 42, 12, 16);
+
+            // Cyber License plate
+            ctx.fillStyle = '#040206';
+            ctx.fillRect(x - 50, y + 38, 100, 26);
+            ctx.strokeStyle = '#9d25cc';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(x - 50, y + 38, 100, 26);
+
+            ctx.fillStyle = '#e5b3ff';
+            ctx.font = '900 10px Courier';
+            ctx.textAlign = 'center';
+            ctx.fillText('HM-CRZR', x, y + 54);
+
+            // BULKY WIDE BODY CHASSIS (Rear hatch/gates)
+            ctx.fillStyle = '#130a1c';
+            ctx.strokeStyle = '#431f63';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.roundRect(x - 200, y - 80, 400, 115, 14);
+            ctx.fill();
+            ctx.stroke();
+
+            // Rear Side panel vertical details / Hinges
+            ctx.fillStyle = '#0d0614';
+            ctx.fillRect(x - 192, y - 60, 22, 60);
+            ctx.fillRect(x + 170, y - 60, 22, 60);
+
+            // REAR MOUNTED SPARE TIRE (Bulky central design signature)
+            ctx.fillStyle = '#060408';
+            ctx.strokeStyle = '#381c53';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(x, y - 10, 68, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Spoke and wheel core
+            ctx.fillStyle = '#11071e';
+            ctx.beginPath();
+            ctx.arc(x, y - 10, 44, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = cityNeon;
+            ctx.lineWidth = 2.5;
+            for (let s = 0; s < 6; s++) {
+                const sa = (s * Math.PI / 3) + (progress * 0.1);
+                ctx.beginPath();
+                ctx.moveTo(x, y - 10);
+                ctx.lineTo(x + 44 * Math.cos(sa), y - 10 + 44 * Math.sin(sa));
+                ctx.stroke();
+            }
+
+            // UPPER CABIN / SQUARE ROOF SHELL
+            ctx.fillStyle = '#0a0512';
+            ctx.strokeStyle = '#3b1c55';
+            ctx.lineWidth = 4.5;
+            ctx.beginPath();
+            ctx.moveTo(x - 170, y - 80);
+            ctx.lineTo(x - 150, y - 165); // boxy incline
+            ctx.lineTo(x + 150, y - 165);
+            ctx.lineTo(x + 170, y - 80);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Boxy Back Window
+            ctx.fillStyle = '#030105';
+            ctx.strokeStyle = 'rgba(157, 37, 204, 0.4)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.roundRect(x - 110, y - 150, 220, 50, 5);
+            ctx.fill();
+            ctx.stroke();
+
+            // Roof utilities / heavy rack
+            ctx.fillStyle = '#09040d';
+            ctx.fillRect(x - 156, y - 172, 312, 8);
+
+            // SUPER BRIGHT LED ROOF LIGHTBAR (Yellow/orange glow)
+            ctx.save();
+            ctx.shadowColor = sunColor;
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = sunColor;
+            ctx.beginPath();
+            ctx.roundRect(x - 120, y - 180, 240, 10, 3);
+            ctx.fill();
+
+            // Flaring hazard highlights on rooftop LED
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 0.5 + Math.sin(nowMs * 0.08) * 0.4;
+            ctx.fillRect(x - 90, y - 180, 180, 10);
+            ctx.restore();
+
+            // Rear Side vertical heavy handles
+            ctx.fillStyle = '#1c1527';
+            ctx.fillRect(x - 186, y - 120, 8, 35);
+            ctx.fillRect(x + 178, y - 120, 8, 35);
+
+            // TAILLIGHTS (Beefy rectangular side brackets)
+            ctx.save();
+            ctx.shadowColor = '#ff003c';
+            ctx.shadowBlur = 14;
+            ctx.fillStyle = '#ff003c';
+            ctx.fillRect(x - 186, y - 35, 24, 16);
+            ctx.fillRect(x + 162, y - 35, 24, 16);
+
+            // Vertical cage slats over brake lights
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#08050c';
+            ctx.fillRect(x - 178, y - 36, 4, 18);
+            ctx.fillRect(x - 170, y - 36, 4, 18);
+            ctx.fillRect(x + 168, y - 36, 4, 18);
+            ctx.fillRect(x + 176, y - 36, 4, 18);
+
+            // Active hazard reflectors underneath bumper
+            ctx.shadowColor = '#ff3300';
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#ff3300';
+            ctx.fillRect(x - 134, y + 10, 18, 5);
+            ctx.fillRect(x + 116, y + 10, 18, 5);
+
+            ctx.restore();
+        }
+
+        function render(nowMs) {
+            const t = (nowMs / 1000) % DURATION;
+            const progress = t / DURATION;
+
+            // Deep dark night Sky gradient
+            const skyGrad = ctx.createLinearGradient(CX, 0, CX, HORIZON_Y);
+            skyGrad.addColorStop(0, '#04010a');
+            skyGrad.addColorStop(0.6, '#0f051c');
+            skyGrad.addColorStop(1, '#2c0d45');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, 1080, HORIZON_Y);
+
+            // Stellar dots
+            ctx.fillStyle = '#fff';
+            for (const s of STARS) {
+                ctx.globalAlpha = s.alpha;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Landscape draw tasks
+            drawDistantCity();
+            drawConcreteCity(progress);
+
+            // Drawing Hummer
+            drawCyberHummer(nowMs, progress);
+
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // 90 BPM DARK AMBIENT PROCEDURAL ENGINE
+        // ==========================================
+        function scheduleDarkAmbientDrive(audioCtx, destinationNode) {
+            const now = audioCtx.currentTime;
+            const master = audioCtx.createGain();
+            master.gain.setValueAtTime(0.52, now);
+            master.connect(destinationNode);
+
+            const BEATS = 12;         // 12 beats = 8.0s at 90 BPM
+            const BEAT_DUR = 8.0 / 12; // ~0.667s per beat
+
+            // 1. HEAVY DEEP 808-STYLE KICK (Slow heartbeats)
+            for (let b = 0; b < BEATS; b++) {
+                const t = now + (b * BEAT_DUR);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                // 80Hz slide to 36Hz
+                osc.frequency.setValueAtTime(80, t);
+                osc.frequency.exponentialRampToValueAtTime(36, t + 0.15);
+
+                gain.gain.setValueAtTime(1.1, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.50);
+            }
+
+            // 2. INDUSTRIAL GATED METALLIC SNARE (Beat 2 and 4 in Bar 1/2)
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+            const out = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+
+            for (let b = 1; b < BEATS; b += 2) {
+                const t = now + (b * BEAT_DUR);
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = noiseBuffer;
+
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.setValueAtTime(1200, t);
+
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.35, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(master);
+                noise.start(t);
+                noise.stop(t + 0.28);
+            }
+
+            // 3. CINEMATIC AMBIENT SUB DRONE & REVERB PAD (Ethereal Chord / F-Minor)
+            const DroneFrequencies = [87.31, 116.54, 130.81, 174.61]; // F, A#, C, F-Octave
+            for (let i = 0; i < DroneFrequencies.length; i++) {
+                const freq = DroneFrequencies[i];
+                const osc = audioCtx.createOscillator();
+                const filt = audioCtx.createBiquadFilter();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now);
+
+                filt.type = 'lowpass';
+                filt.frequency.setValueAtTime(150, now);
+                // Sweeps/opens from second 0.0 -> 4.0 -> 8.0 to loop smoothly
+                filt.frequency.linearRampToValueAtTime(320, now + 4.0);
+                filt.frequency.linearRampToValueAtTime(150, now + 8.0);
+
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.linearRampToValueAtTime(0.24, now + 4.0);
+                gain.gain.linearRampToValueAtTime(0.12, now + 8.0);
+
+                osc.connect(filt);
+                filt.connect(gain);
+                gain.connect(master);
+                osc.start(now);
+                osc.stop(now + 8.0);
+            }
+
+            // 4. LOW ROLLING 16th-NOTE CHORD ARPEGGIO (Deep atmospheric synth sweep)
+            const SIXTEENTH = BEAT_DUR / 4;
+            const scale = [174.61, 207.65, 261.63, 311.13, 349.23, 261.63]; // F minor / Phrygian run
+            for (let step = 0; step < BEATS * 4; step++) {
+                const t = now + (step * SIXTEENTH);
+                const freq = scale[step % scale.length];
+
+                const osc = audioCtx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, t);
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(450, t);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.15, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(master);
+                osc.start(t);
+                osc.stop(t + 0.14);
+            }
+        }
+
+        // --- PREVIEW TOGGLE ---
+        let previewCtx = null;
+        let previewTimer = null;
+        let isPreviewing = false;
+
+        function playLoop() {
+            if (!isPreviewing || !previewCtx) return;
+            scheduleDarkAmbientDrive(previewCtx, previewCtx.destination);
+            previewTimer = setTimeout(playLoop, 8000);
+        }
+
+        previewBtn.addEventListener('click', async () => {
+            if (!isPreviewing) {
+                previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await previewCtx.resume();
+                isPreviewing = true;
+                playLoop();
+
+                previewBtn.innerText = '■ Stop Ambient Preview';
+                previewBtn.style.background = '#441414';
+                previewBtn.style.color = '#ff6b6b';
+                previewBtn.style.borderColor = '#ff6b6b';
+            } else {
+                isPreviewing = false;
+                clearTimeout(previewTimer);
+                if (previewCtx) previewCtx.close();
+
+                previewBtn.innerText = '▶ Play 90BPM Ambient';
+                previewBtn.style.background = '#1b072d';
+                previewBtn.style.color = '#d178ff';
+                previewBtn.style.borderColor = '#9d25cc';
+            }
+        });
+
+        // --- RECORD BAKE MP4 ---
+        btn.addEventListener('click', async () => {
+            if (isPreviewing) previewBtn.click();
+
+            btn.disabled = true;
+            btn.innerText = 'Recording (8.0s)...';
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            await audioCtx.resume();
+
+            const audioDest = audioCtx.createMediaStreamDestination();
+            const monitorNode = audioCtx.createGain();
+            monitorNode.gain.value = 1.0;
+            monitorNode.connect(audioDest);
+            monitorNode.connect(audioCtx.destination);
+
+            scheduleDarkAmbientDrive(audioCtx, monitorNode);
+
+            const videoStream = canvas.captureStream(60);
+            const combinedStream = new MediaStream([
+                ...videoStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ]);
+
+            const preferredTypes = [
+                'video/mp4;codecs=avc1,mp4a.40.2',
+                'video/mp4',
+                'video/webm;codecs=vp9,opus',
+                'video/webm'
+            ];
+            const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 30000000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                audioCtx.close();
+
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cyber_hummer_city_8s.${ext}`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                btn.disabled = false;
+                btn.innerText = '● Record 8s MP4';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), 8000);
+        });
+    </script>
+</body>
+
+</html>
