@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic Graffiti Shatter-Cube // Kev's Art Lab</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #06050b;
+            color: #00f0ff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .hud {
+            position: absolute;
+            top: 16px;
+            z-index: 10;
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            background: #120e24;
+            color: #ffe600;
+            border: 2px solid #ff0055;
+            padding: 10px 18px;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 12px rgba(255, 0, 85, 0.4);
+            transition: all 0.15s ease;
+        }
+
+        button:hover {
+            background: #ff0055;
+            color: #ffffff;
+            box-shadow: 0 0 20px #ff0055;
+        }
+
+        #viewport {
+            height: 92vh;
+            aspect-ratio: 9 / 16;
+            background: #0a0814;
+            border: 2px solid #201a3d;
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.2);
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="hud">
+        <button id="audioBtn">🔊 Start Audio Engine</button>
+        <button id="recBtn">⏺ Record 8s Loop</button>
+    </div>
+
+    <canvas id="viewport" width="1080" height="1920"></canvas>
+
+    <script>
+        const canvas = document.getElementById('viewport');
+        const ctx = canvas.getContext('2d');
+        const audioBtn = document.getElementById('audioBtn');
+        const recBtn = document.getElementById('recBtn');
+
+        const LOOP_DURATION = 8.0;
+        const CUBE_COUNT = 4;
+        const BASE_SIZE = 70;
+
+        const PALETTE = [
+            '#ff0055', '#ffe600', '#00f0ff', '#39ff14', '#b026ff', '#ff5500'
+        ];
+
+        const shards = [];
+        const offset = (CUBE_COUNT - 1) / 2;
+
+        for (let x = 0; x < CUBE_COUNT; x++) {
+            for (let y = 0; y < CUBE_COUNT; y++) {
+                for (let z = 0; z < CUBE_COUNT; z++) {
+                    const originX = (x - offset) * (BASE_SIZE * 2.05);
+                    const originY = (y - offset) * (BASE_SIZE * 2.05);
+                    const originZ = (z - offset) * (BASE_SIZE * 2.05);
+
+                    const mag = Math.hypot(originX, originY, originZ) || 1;
+                    const dirX = (originX / mag) + (Math.random() - 0.5) * 0.8;
+                    const dirY = (originY / mag) + (Math.random() - 0.5) * 0.8;
+                    const dirZ = (originZ / mag) + (Math.random() - 0.5) * 0.8;
+
+                    shards.push({
+                        origin: [originX, originY, originZ],
+                        dir: [dirX * 600, dirY * 600, dirZ * 600],
+                        spinAxis: [Math.random() * 4, Math.random() * 4, Math.random() * 4],
+                        color: PALETTE[(x + y + z) % PALETTE.length],
+                        size: BASE_SIZE
+                    });
+                }
+            }
+        }
+
+        function rotateX(p, a) {
+            const cos = Math.cos(a), sin = Math.sin(a);
+            return [p[0], p[1] * cos - p[2] * sin, p[1] * sin + p[2] * cos];
+        }
+        function rotateY(p, a) {
+            const cos = Math.cos(a), sin = Math.sin(a);
+            return [p[0] * cos + p[2] * sin, p[1], -p[0] * sin + p[2] * cos];
+        }
+        function rotateZ(p, a) {
+            const cos = Math.cos(a), sin = Math.sin(a);
+            return [p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos, p[2]];
+        }
+
+        function project(p, fov = 1150, viewDist = 1450) {
+            const z = p[2] + viewDist;
+            const scale = fov / Math.max(10, z);
+            return [
+                canvas.width / 2 + p[0] * scale,
+                canvas.height / 2 + p[1] * scale,
+                z
+            ];
+        }
+
+        const cubeFaceIndices = [
+            [0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
+            [1, 5, 6, 2], [4, 5, 1, 0], [3, 2, 6, 7]
+        ];
+
+        let startTime = null;
+
+        function render(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const elapsed = (timestamp - startTime) / 1000;
+            const t = elapsed % LOOP_DURATION;
+            const cycleProgress = t / LOOP_DURATION;
+
+            const shatterAmp = Math.pow(Math.sin(cycleProgress * Math.PI), 2.2);
+            const camY = cycleProgress * Math.PI * 2;
+            const camX = Math.sin(cycleProgress * Math.PI * 2) * 0.35;
+
+            ctx.fillStyle = '#06050c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const bgGlow = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 80,
+                canvas.width / 2, canvas.height / 2, 800
+            );
+            bgGlow.addColorStop(0, 'rgba(176, 38, 255, 0.28)');
+            bgGlow.addColorStop(0.5, 'rgba(0, 240, 255, 0.1)');
+            bgGlow.addColorStop(1, 'rgba(6, 5, 12, 0)');
+            ctx.fillStyle = bgGlow;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const renderFaces = [];
+
+            shards.forEach(s => {
+                const cx = s.origin[0] + s.dir[0] * shatterAmp;
+                const cy = s.origin[1] + s.dir[1] * shatterAmp;
+                const cz = s.origin[2] + s.dir[2] * shatterAmp;
+
+                const rotAmt = shatterAmp * Math.PI * 2;
+                const rx = s.spinAxis[0] * rotAmt;
+                const ry = s.spinAxis[1] * rotAmt;
+                const rz = s.spinAxis[2] * rotAmt;
+
+                const hs = s.size;
+                const localVerts = [
+                    [-hs, -hs, -hs], [hs, -hs, -hs], [hs, hs, -hs], [-hs, hs, -hs],
+                    [-hs, -hs, hs], [hs, -hs, hs], [hs, hs, hs], [-hs, hs, hs]
+                ];
+
+                const worldVerts = localVerts.map(v => {
+                    let p = rotateX(v, rx);
+                    p = rotateY(p, ry);
+                    p = rotateZ(p, rz);
+                    p = [p[0] + cx, p[1] + cy, p[2] + cz];
+                    p = rotateX(p, camX);
+                    p = rotateY(p, camY);
+                    return p;
+                });
+
+                cubeFaceIndices.forEach(idx => {
+                    const v0 = worldVerts[idx[0]];
+                    const v1 = worldVerts[idx[1]];
+                    const v2 = worldVerts[idx[2]];
+
+                    const ax = v1[0] - v0[0], ay = v1[1] - v0[1], az = v1[2] - v0[2];
+                    const bx = v2[0] - v0[0], by = v2[1] - v0[1], bz = v2[2] - v0[2];
+                    const nx = ay * bz - az * by;
+                    const ny = az * bx - ax * bz;
+                    const nz = ax * by - ay * bx;
+
+                    const avgZ = (v0[2] + v1[2] + v2[2] + worldVerts[idx[3]][2]) / 4;
+                    renderFaces.push({
+                        points: idx.map(i => project(worldVerts[i])),
+                        avgZ: avgZ,
+                        color: s.color,
+                        normalLight: Math.max(0.2, Math.abs(nx * 0.4 - ny * 0.7 - nz * 0.6) / (Math.hypot(nx, ny, nz) || 1))
+                    });
+                });
+            });
+
+            renderFaces.sort((a, b) => b.avgZ - a.avgZ);
+
+            renderFaces.forEach(face => {
+                ctx.beginPath();
+                ctx.moveTo(face.points[0][0], face.points[0][1]);
+                for (let i = 1; i < face.points.length; i++) {
+                    ctx.lineTo(face.points[i][0], face.points[i][1]);
+                }
+                ctx.closePath();
+
+                ctx.fillStyle = face.color;
+                ctx.fill();
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${face.normalLight * 0.35})`;
+                ctx.fill();
+
+                ctx.strokeStyle = '#05030a';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            });
+
+            if (cycleProgress < 0.25) {
+                ctx.save();
+                ctx.fillStyle = '#ffe600';
+                ctx.font = '900 44px monospace';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#ff0055';
+                ctx.shadowBlur = 20;
+                ctx.fillText('⚡ WATCH IT SNAP BACK ⚡', canvas.width / 2, 380);
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = '600 32px monospace';
+                ctx.fillText('100% Code // Zero AI', canvas.width / 2, 440);
+                ctx.restore();
+            }
+
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+        // ==========================================
+        // AUDIO ENGINE + MEDIA STREAM EXPORT
+        // ==========================================
+        let audioCtx = null;
+        let audioDest = null; // Stream destination node for recorder
+
+        function ensureAudioEngine() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                audioDest = audioCtx.createMediaStreamDestination();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playAudioEngine() {
+            ensureAudioEngine();
+            const now = audioCtx.currentTime;
+
+            // 1. Sub-Bass Snap
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(32, now + 0.6);
+            gain.gain.setValueAtTime(0.8, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+            // Connect to speakers AND stream destination
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.connect(audioDest);
+            osc.start(now);
+            osc.stop(now + 0.8);
+
+            // 2. Reverse Pitch Riser
+            const riser = audioCtx.createOscillator();
+            const riserGain = audioCtx.createGain();
+            riser.type = 'sawtooth';
+            riser.frequency.setValueAtTime(45, now + 5.2);
+            riser.frequency.exponentialRampToValueAtTime(380, now + 7.85);
+            riserGain.gain.setValueAtTime(0.0001, now + 5.2);
+            riserGain.gain.linearRampToValueAtTime(0.3, now + 7.8);
+            riserGain.gain.linearRampToValueAtTime(0.0001, now + 7.9);
+
+            // Connect to speakers AND stream destination
+            riser.connect(riserGain);
+            riserGain.connect(audioCtx.destination);
+            riserGain.connect(audioDest);
+            riser.start(now + 5.2);
+            riser.stop(now + 7.9);
+
+            setTimeout(() => {
+                if (audioCtx) playAudioEngine();
+            }, LOOP_DURATION * 1000);
+        }
+
+        audioBtn.addEventListener('click', () => {
+            playAudioEngine();
+            audioBtn.textContent = '🔊 Engine Active';
+            audioBtn.style.borderColor = '#39ff14';
+            audioBtn.style.color = '#39ff14';
+        });
+
+        // ==========================================
+        // RECORDER: Combined Audio + Video Tracks
+        // ==========================================
+        recBtn.addEventListener('click', () => {
+            ensureAudioEngine();
+            if (audioBtn.textContent !== '🔊 Engine Active') {
+                playAudioEngine();
+                audioBtn.textContent = '🔊 Engine Active';
+                audioBtn.style.borderColor = '#39ff14';
+                audioBtn.style.color = '#39ff14';
+            }
+
+            recBtn.textContent = 'Recording 8s...';
+            recBtn.style.borderColor = '#ffe600';
+
+            const canvasStream = canvas.captureStream(60);
+            const audioTrack = audioDest.stream.getAudioTracks()[0];
+
+            // Combine video track and audio track into a single MediaStream
+            const combinedTracks = [...canvasStream.getVideoTracks()];
+            if (audioTrack) {
+                combinedTracks.push(audioTrack);
+            }
+            const combinedStream = new MediaStream(combinedTracks);
+
+            const recorder = new MediaRecorder(combinedStream, {
+                mimeType: 'video/webm;codecs=vp9,opus',
+                videoBitsPerSecond: 45000000,
+                audioBitsPerSecond: 192000
+            });
+
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'kinetic_graffiti_shatter_audio_8s.webm';
+                a.click();
+                recBtn.textContent = '⏺ Record 8s Loop';
+                recBtn.style.borderColor = '#ff0055';
+            };
+
+            recorder.start();
+            setTimeout(() => recorder.stop(), LOOP_DURATION * 1000);
+        });
+    </script>
+</body>
+
+</html>
