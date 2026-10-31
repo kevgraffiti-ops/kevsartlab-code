@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Vortex Hyper-Engine v2</title>
+    <title>Cyber Vortex Hyper-Engine v2 - Bloom Edition</title>
     <style>
         * {
             box-sizing: border-box;
@@ -241,8 +241,17 @@
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
         }
     </style>
+    <!-- Three.js Core -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Post-Processing Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 </head>
 
 <body>
@@ -250,6 +259,16 @@
 
     <div id="hud-panel">
         <div class="panel-title">⚡ HYPER VORTEX v2</div>
+
+        <div class="section-label">✨ UNREAL BLOOM GLOW</div>
+        <div class="control-group">
+            <div class="control-label">BLOOM STRENGTH <span id="val-bloom-strength">1.5</span></div>
+            <input type="range" id="param-bloom-strength" min="0.0" max="3.5" step="0.1" value="1.5">
+        </div>
+        <div class="control-group">
+            <div class="control-label">BLOOM RADIUS <span id="val-bloom-radius">0.4</span></div>
+            <input type="range" id="param-bloom-radius" min="0.0" max="1.0" step="0.05" value="0.4">
+        </div>
 
         <div class="section-label">🎨 COLOR PALETTE</div>
         <div class="color-grid">
@@ -329,11 +348,25 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(viewport.clientWidth, viewport.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
         viewport.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
+
+        // --- Post-Processing Pipeline ---
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(viewport.clientWidth, viewport.clientHeight),
+            1.5, // Bloom strength
+            0.4, // Bloom radius
+            0.15 // Bloom threshold
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
 
         // --- Expanded Shape Target Generator ---
         function createExpandedMorphGeometry(radius) {
@@ -381,7 +414,7 @@
 
         // --- Core Meshes ---
         const coreGeo = createExpandedMorphGeometry(4.5);
-        const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.85 });
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.95 });
         const coreMesh = new THREE.Mesh(coreGeo, coreMat);
         scene.add(coreMesh);
 
@@ -436,6 +469,15 @@
         let morphValue = 0;
 
         // --- UI Controls Listeners ---
+        document.getElementById('param-bloom-strength').addEventListener('input', e => {
+            bloomPass.strength = parseFloat(e.target.value);
+            document.getElementById('val-bloom-strength').innerText = bloomPass.strength.toFixed(1);
+        });
+        document.getElementById('param-bloom-radius').addEventListener('input', e => {
+            bloomPass.radius = parseFloat(e.target.value);
+            document.getElementById('val-bloom-radius').innerText = bloomPass.radius.toFixed(2);
+        });
+
         document.getElementById('col-outer').addEventListener('input', e => coreMat.color.set(e.target.value));
         document.getElementById('col-inner').addEventListener('input', e => innerMat.color.set(e.target.value));
         document.getElementById('col-stars').addEventListener('input', e => particleMat.color.set(e.target.value));
@@ -492,6 +534,7 @@
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
+            composer.setSize(w, h);
         }
         window.addEventListener('resize', resize);
 
@@ -511,7 +554,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `cyber-vortex2-${Date.now()}.webm`;
+                    a.download = `bloom-vortex-${Date.now()}.webm`;
                     a.click();
                     recordBtn.classList.remove('recording');
                     recordBtn.innerText = '⏺ Record WebM Clip';
@@ -537,7 +580,7 @@
 
             let currentMorph = morphValue;
             if (autoMorph) {
-                currentMorph = (Math.sin(elapsed * 0.4) + 1) * 2.5; // Cycles across 0..5
+                currentMorph = (Math.sin(elapsed * 0.4) + 1) * 2.5;
             }
 
             applyMultiMorph(coreMesh, currentMorph);
@@ -565,7 +608,7 @@
             particleGeo.attributes.position.needsUpdate = true;
 
             controls.update();
-            renderer.render(scene, camera);
+            composer.render();
         }
         resize();
         animate();
