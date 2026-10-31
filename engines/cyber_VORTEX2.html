@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Vortex Hyper-Engine v2 - Bloom Edition</title>
+    <title>Cyber Vortex Hyper-Engine v2 - Audio Reactive Edition</title>
     <style>
         * {
             box-sizing: border-box;
@@ -192,7 +192,8 @@
         }
 
         select,
-        button {
+        button,
+        input[type="file"] {
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(0, 243, 255, 0.3);
             color: #e0e6ed;
@@ -241,14 +242,11 @@
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
         }
     </style>
-    <!-- Three.js Core -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <!-- Post-Processing Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
@@ -259,6 +257,19 @@
 
     <div id="hud-panel">
         <div class="panel-title">⚡ HYPER VORTEX v2</div>
+
+        <div class="section-label">🎵 AUDIO REACTIVITY</div>
+        <div class="control-group">
+            <button id="btn-mic">🎙️ Enable Microphone</button>
+            <input type="file" id="input-audio" accept="audio/*" style="display:none">
+            <button id="btn-upload">📁 Upload MP3 Track</button>
+            <audio id="audio-player" controls
+                style="width: 100%; height: 30px; margin-top: 4px; display: none;"></audio>
+        </div>
+        <div class="control-group">
+            <div class="control-label">BASS PULSE SENSITIVITY <span id="val-audio-sens">1.5</span></div>
+            <input type="range" id="param-audio-sens" min="0.0" max="3.0" step="0.1" value="1.5">
+        </div>
 
         <div class="section-label">✨ UNREAL BLOOM GLOW</div>
         <div class="control-group">
@@ -311,25 +322,28 @@
         <div class="section-label">🌀 VORTEX DYNAMICS</div>
         <div class="control-group">
             <div class="control-label">WARP SPEED <span id="val-speed">2.0</span></div>
-            <input type="range" id="param-speed" min="0.2" max="6.0" step="0.1" value="2.0">
+            <input type="range" id="param-speed" min="0
+      <div class=" control-label">WARP SPEED <span id="val-speed">2.0</span>
         </div>
-        <div class="control-group">
-            <div class="control-label">VORTEX TWIST <span id="val-twist">3.5</span></div>
-            <input type="range" id="param-twist" min="0.5" max="8.0" step="0.1" value="3.5">
-        </div>
-        <div class="control-group">
-            <div class="control-label">CORE SCALE <span id="val-scale">1.8</span></div>
-            <input type="range" id="param-scale" min="0.8" max="3.5" step="0.1" value="1.8">
-        </div>
-        <div class="control-group">
-            <div class="control-label">VIEWPORT ASPECT</div>
-            <select id="select-aspect">
-                <option value="aspect-9-16">9:16 Vertical Reel</option>
-                <option value="aspect-1-1">1:1 Square</option>
-                <option value="aspect-16-9">16:9 Widescreen</option>
-            </select>
-        </div>
-        <button id="btn-record" class="btn-record">⏺ Record WebM Clip</button>
+        <input type="range" id="param-speed" min="0.2" max="6.0" step="0.1" value="2.0">
+    </div>
+    <div class="control-group">
+        <div class="control-label">VORTEX TWIST <span id="val-twist">3.5</span></div>
+        <input type="range" id="param-twist" min="0.5" max="8.0" step="0.1" value="3.5">
+    </div>
+    <div class="control-group">
+        <div class="control-label">CORE SCALE <span id="val-scale">1.8</span></div>
+        <input type="range" id="param-scale" min="0.8" max="3.5" step="0.1" value="1.8">
+    </div>
+    <div class="control-group">
+        <div class="control-label">VIEWPORT ASPECT</div>
+        <select id="select-aspect">
+            <option value="aspect-9-16">9:16 Vertical Reel</option>
+            <option value="aspect-1-1">1:1 Square</option>
+            <option value="aspect-16-9">16:9 Widescreen</option>
+        </select>
+    </div>
+    <button id="btn-record" class="btn-record">⏺ Record WebM Clip</button>
     </div>
 
     <div id="canvas-container">
@@ -359,14 +373,72 @@
         const renderScene = new THREE.RenderPass(scene, camera);
         const bloomPass = new THREE.UnrealBloomPass(
             new THREE.Vector2(viewport.clientWidth, viewport.clientHeight),
-            1.5, // Bloom strength
-            0.4, // Bloom radius
-            0.15 // Bloom threshold
+            1.5, 0.4, 0.15
         );
 
         const composer = new THREE.EffectComposer(renderer);
         composer.addPass(renderScene);
         composer.addPass(bloomPass);
+
+        // --- Web Audio API Engine ---
+        let audioCtx, analyser, dataArray;
+        let audioSensitivity = 1.5;
+        let isAudioActive = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Microphone Input
+        document.getElementById('btn-mic').addEventListener('click', async () => {
+            try {
+                initAudio();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const source = audioCtx.createMediaStreamSource(stream);
+                source.connect(analyser);
+                isAudioActive = true;
+                document.getElementById('btn-mic').innerText = '🎙️ Mic Connected';
+                document.getElementById('btn-mic').style.borderColor = '#00f3ff';
+            } catch (err) {
+                alert('Microphone access denied or unavailable.');
+            }
+        });
+
+        // File Upload Input
+        const audioPlayer = document.getElementById('audio-player');
+        const uploadInput = document.getElementById('input-audio');
+
+        document.getElementById('btn-upload').addEventListener('click', () => uploadInput.click());
+
+        uploadInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                initAudio();
+                const url = URL.createObjectURL(file);
+                audioPlayer.src = url;
+                audioPlayer.style.display = 'block';
+
+                const source = audioCtx.createMediaElementSource(audioPlayer);
+                source.connect(analyser);
+                analyser.connect(audioCtx.destination);
+
+                audioPlayer.play();
+                isAudioActive = true;
+            }
+        });
+
+        document.getElementById('param-audio-sens').addEventListener('input', e => {
+            audioSensitivity = parseFloat(e.target.value);
+            document.getElementById('val-audio-sens').innerText = audioSensitivity.toFixed(1);
+        });
 
         // --- Expanded Shape Target Generator ---
         function createExpandedMorphGeometry(radius) {
@@ -467,11 +539,13 @@
         let scale = 1.8;
         let autoMorph = true;
         let morphValue = 0;
+        let baseBloomStrength = 1.5;
 
         // --- UI Controls Listeners ---
         document.getElementById('param-bloom-strength').addEventListener('input', e => {
-            bloomPass.strength = parseFloat(e.target.value);
-            document.getElementById('val-bloom-strength').innerText = bloomPass.strength.toFixed(1);
+            baseBloomStrength = parseFloat(e.target.value);
+            bloomPass.strength = baseBloomStrength;
+            document.getElementById('val-bloom-strength').innerText = baseBloomStrength.toFixed(1);
         });
         document.getElementById('param-bloom-radius').addEventListener('input', e => {
             bloomPass.radius = parseFloat(e.target.value);
@@ -554,7 +628,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `bloom-vortex-${Date.now()}.webm`;
+                    a.download = `reactive-vortex-${Date.now()}.webm`;
                     a.click();
                     recordBtn.classList.remove('recording');
                     recordBtn.innerText = '⏺ Record WebM Clip';
@@ -578,6 +652,29 @@
             requestAnimationFrame(animate);
             const elapsed = clock.getElapsedTime();
 
+            // Audio Frequency Calculations
+            let bassBoost = 0;
+            let trebleBoost = 0;
+
+            if (isAudioActive && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+
+                // Low frequencies (Bass: bins 0-10)
+                let bassSum = 0;
+                for (let i = 0; i < 10; i++) bassSum += dataArray[i];
+                bassBoost = (bassSum / 10 / 255) * audioSensitivity;
+
+                // High frequencies (Treble: bins 80-120)
+                let trebleSum = 0;
+                for (let i = 80; i < 120; i++) trebleSum += dataArray[i];
+                trebleBoost = (trebleSum / 40 / 255) * audioSensitivity;
+            }
+
+            // Dynamic Audio Modulations
+            const dynamicScale = scale + (bassBoost * 1.8) + Math.sin(elapsed * 3) * 0.15;
+            bloomPass.strength = baseBloomStrength + (bassBoost * 2.2);
+            const dynamicSpeed = speed + (trebleBoost * 4.0);
+
             let currentMorph = morphValue;
             if (autoMorph) {
                 currentMorph = (Math.sin(elapsed * 0.4) + 1) * 2.5;
@@ -586,23 +683,23 @@
             applyMultiMorph(coreMesh, currentMorph);
             applyMultiMorph(innerMesh, (currentMorph + 1.5) % 5);
 
-            coreMesh.rotation.x = elapsed * speed * 0.3;
-            coreMesh.rotation.y = elapsed * speed * 0.5;
-            coreMesh.scale.setScalar(scale + Math.sin(elapsed * 3) * 0.15);
+            coreMesh.rotation.x = elapsed * dynamicSpeed * 0.3;
+            coreMesh.rotation.y = elapsed * dynamicSpeed * 0.5;
+            coreMesh.scale.setScalar(dynamicScale);
 
-            innerMesh.rotation.x = -elapsed * speed * 0.6;
-            innerMesh.rotation.z = elapsed * speed * 0.4;
+            innerMesh.rotation.x = -elapsed * dynamicSpeed * 0.6;
+            innerMesh.rotation.z = elapsed * dynamicSpeed * 0.4;
 
             tunnelGroup.children.forEach((ring, idx) => {
-                ring.rotation.z = elapsed * speed * 0.4 + idx * (twist * 0.04);
+                ring.rotation.z = elapsed * dynamicSpeed * 0.4 + idx * (twist * 0.04);
                 ring.rotation.x = Math.sin(elapsed * 0.8 + idx * 0.08) * 0.25;
-                const currentHue = (ringMaterials[idx].baseHue + elapsed * 0.12) % 1.0;
+                const currentHue = (ringMaterials[idx].baseHue + elapsed * 0.12 + trebleBoost * 0.2) % 1.0;
                 ringMaterials[idx].mat.color.setHSL(currentHue, 1.0, 0.55);
             });
 
             const positions = particleGeo.attributes.position.array;
             for (let i = 2; i < particleCount * 3; i += 3) {
-                positions[i] += speed * 0.2;
+                positions[i] += dynamicSpeed * 0.2;
                 if (positions[i] > 100) positions[i] = -100;
             }
             particleGeo.attributes.position.needsUpdate = true;
