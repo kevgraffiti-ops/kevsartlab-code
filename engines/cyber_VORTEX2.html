@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Vortex Hyper-Engine</title>
+    <title>Cyber Vortex Hyper-Engine v2</title>
     <style>
         * {
             box-sizing: border-box;
@@ -69,8 +69,10 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            width: 290px;
-            background: rgba(4, 8, 18, 0.85);
+            width: 310px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            background: rgba(4, 8, 18, 0.88);
             border: 1px solid rgba(0, 243, 255, 0.4);
             border-radius: 10px;
             backdrop-filter: blur(25px);
@@ -84,7 +86,7 @@
         }
 
         #hud-panel.collapsed {
-            transform: translateX(-340px);
+            transform: translateX(-360px);
             opacity: 0;
             pointer-events: none;
         }
@@ -96,6 +98,19 @@
             color: #00f3ff;
             text-transform: uppercase;
             text-shadow: 0 0 8px #00f3ff;
+            margin-bottom: 2px;
+        }
+
+        .section-label {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: #00f3ff;
+            text-transform: uppercase;
+            opacity: 0.7;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+            padding-bottom: 3px;
+            margin-top: 4px;
         }
 
         .control-group {
@@ -116,6 +131,44 @@
         .control-label span {
             color: #00f3ff;
             font-family: monospace;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .color-picker-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            font-size: 10px;
+            font-weight: 700;
+            color: #8c9eae;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
         }
 
         input[type="range"] {
@@ -196,14 +249,50 @@
     <button class="toggle-ui-btn" id="toggle-ui">⚙️</button>
 
     <div id="hud-panel">
-        <div class="panel-title">⚡ HYPER VORTEX CORE</div>
+        <div class="panel-title">⚡ HYPER VORTEX v2</div>
+
+        <div class="section-label">🎨 COLOR PALETTE</div>
+        <div class="color-grid">
+            <div class="color-picker-item">
+                <span>OUTER CORE</span>
+                <input type="color" id="col-outer" value="#00f3ff">
+            </div>
+            <div class="color-picker-item">
+                <span>INNER CORE</span>
+                <input type="color" id="col-inner" value="#ff0055">
+            </div>
+            <div class="color-picker-item">
+                <span>STARS</span>
+                <input type="color" id="col-stars" value="#00f3ff">
+            </div>
+            <div class="color-picker-item">
+                <span>BG SPACE</span>
+                <input type="color" id="col-bg" value="#020209">
+            </div>
+        </div>
+
+        <div class="section-label">📐 GEOMETRY & MORPH</div>
+        <div class="control-group">
+            <div class="control-label">GEOMETRY SHAPE <span id="val-shape">AUTO MORPH</span></div>
+            <select id="select-shape">
+                <option value="auto">Auto-Cycle Morph</option>
+                <option value="0">Cube</option>
+                <option value="1">Octahedron</option>
+                <option value="2">Icosahedron</option>
+                <option value="3">Dodecahedron</option>
+                <option value="4">Torus (Donut)</option>
+                <option value="5">Torus Knot</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <div class="control-label">MORPH SLIDER <span id="val-morph">AUTO</span></div>
+            <input type="range" id="param-morph" min="0" max="5" step="0.01" value="0">
+        </div>
+
+        <div class="section-label">🌀 VORTEX DYNAMICS</div>
         <div class="control-group">
             <div class="control-label">WARP SPEED <span id="val-speed">2.0</span></div>
             <input type="range" id="param-speed" min="0.2" max="6.0" step="0.1" value="2.0">
-        </div>
-        <div class="control-group">
-            <div class="control-label">GEOMETRY MORPH <span id="val-morph">AUTO</span></div>
-            <input type="range" id="param-morph" min="0" max="2" step="0.01" value="0">
         </div>
         <div class="control-group">
             <div class="control-label">VORTEX TWIST <span id="val-twist">3.5</span></div>
@@ -246,16 +335,20 @@
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
-        // --- Helper: Build Morphing Geometry ---
-        function createMorphGeometry(radius) {
-            // High-density sphere base ensuring equal vertex count across all target shapes
-            const baseGeo = new THREE.SphereGeometry(radius, 32, 32);
+        // --- Expanded Shape Target Generator ---
+        function createExpandedMorphGeometry(radius) {
+            const baseGeo = new THREE.SphereGeometry(radius, 36, 36);
             const posAttr = baseGeo.attributes.position;
             const vertexCount = posAttr.count;
 
-            const cubeGeo = new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5, 10, 10, 10);
-            const octaGeo = new THREE.OctahedronGeometry(radius * 1.6, 4);
-            const icoGeo = new THREE.IcosahedronGeometry(radius * 1.6, 3);
+            const shapes = [
+                new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5, 12, 12, 12),
+                new THREE.OctahedronGeometry(radius * 1.6, 4),
+                new THREE.IcosahedronGeometry(radius * 1.6, 3),
+                new THREE.DodecahedronGeometry(radius * 1.5, 3),
+                new THREE.TorusGeometry(radius * 1.1, radius * 0.45, 16, 32),
+                new THREE.TorusKnotGeometry(radius * 0.8, radius * 0.25, 48, 12)
+            ];
 
             function projectToShape(targetGeo) {
                 const targetPositions = new Float32Array(vertexCount * 3);
@@ -282,27 +375,22 @@
                 return new THREE.Float32BufferAttribute(targetPositions, 3);
             }
 
-            baseGeo.morphAttributes.position = [
-                projectToShape(cubeGeo), // Morph target 0: Cube
-                projectToShape(octaGeo), // Morph target 1: Octahedron
-                projectToShape(icoGeo)   // Morph target 2: Icosahedron
-            ];
-
+            baseGeo.morphAttributes.position = shapes.map(s => projectToShape(s));
             return baseGeo;
         }
 
-        // --- Construct Core Wireframe Meshes ---
-        const coreGeo = createMorphGeometry(4.5);
+        // --- Core Meshes ---
+        const coreGeo = createExpandedMorphGeometry(4.5);
         const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.85 });
         const coreMesh = new THREE.Mesh(coreGeo, coreMat);
         scene.add(coreMesh);
 
-        const innerGeo = createMorphGeometry(2.5);
+        const innerGeo = createExpandedMorphGeometry(2.5);
         const innerMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true, transparent: true, opacity: 0.95 });
         const innerMesh = new THREE.Mesh(innerGeo, innerMat);
         scene.add(innerMesh);
 
-        // --- Outer Vortex Tunnel ---
+        // --- Tunnel ---
         const tunnelGroup = new THREE.Group();
         scene.add(tunnelGroup);
         const RING_COUNT = 70;
@@ -325,7 +413,7 @@
             tunnelGroup.add(mesh);
         }
 
-        // --- Particle Field ---
+        // --- Particles ---
         const particleCount = 1200;
         const particleGeo = new THREE.BufferGeometry();
         const particlePos = new Float32Array(particleCount * 3);
@@ -340,12 +428,43 @@
         const particles = new THREE.Points(particleGeo, particleMat);
         scene.add(particles);
 
-        // --- Parameters & Event Listeners ---
+        // --- Parameters ---
         let speed = 2.0;
         let twist = 3.5;
         let scale = 1.8;
-        let manualMorph = false;
+        let autoMorph = true;
         let morphValue = 0;
+
+        // --- UI Controls Listeners ---
+        document.getElementById('col-outer').addEventListener('input', e => coreMat.color.set(e.target.value));
+        document.getElementById('col-inner').addEventListener('input', e => innerMat.color.set(e.target.value));
+        document.getElementById('col-stars').addEventListener('input', e => particleMat.color.set(e.target.value));
+        document.getElementById('col-bg').addEventListener('input', e => {
+            const c = new THREE.Color(e.target.value);
+            scene.background = c;
+            scene.fog.color = c;
+        });
+
+        document.getElementById('select-shape').addEventListener('change', e => {
+            if (e.target.value === 'auto') {
+                autoMorph = true;
+                document.getElementById('val-shape').innerText = 'AUTO MORPH';
+            } else {
+                autoMorph = false;
+                morphValue = parseFloat(e.target.value);
+                document.getElementById('param-morph').value = morphValue;
+                document.getElementById('val-morph').innerText = morphValue.toFixed(2);
+                document.getElementById('val-shape').innerText = 'FIXED';
+            }
+        });
+
+        document.getElementById('param-morph').addEventListener('input', e => {
+            morphValue = parseFloat(e.target.value);
+            autoMorph = false;
+            document.getElementById('select-shape').value = Math.round(morphValue).toString();
+            document.getElementById('val-morph').innerText = morphValue.toFixed(2);
+            document.getElementById('val-shape').innerText = 'MANUAL';
+        });
 
         document.getElementById('param-speed').addEventListener('input', e => {
             speed = parseFloat(e.target.value);
@@ -358,11 +477,6 @@
         document.getElementById('param-scale').addEventListener('input', e => {
             scale = parseFloat(e.target.value);
             document.getElementById('val-scale').innerText = scale.toFixed(1);
-        });
-        document.getElementById('param-morph').addEventListener('input', e => {
-            morphValue = parseFloat(e.target.value);
-            manualMorph = true;
-            document.getElementById('val-morph').innerText = morphValue.toFixed(2);
         });
         document.getElementById('toggle-ui').addEventListener('click', () => {
             document.getElementById('hud-panel').classList.toggle('collapsed');
@@ -397,7 +511,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `morph-vortex-${Date.now()}.webm`;
+                    a.download = `cyber-vortex2-${Date.now()}.webm`;
                     a.click();
                     recordBtn.classList.remove('recording');
                     recordBtn.innerText = '⏺ Record WebM Clip';
@@ -408,12 +522,12 @@
             }
         });
 
-        // --- Morph Calculation Logic ---
-        function applyMorphState(mesh, val) {
-            // Target 0 = Cube, Target 1 = Octahedron, Target 2 = Icosahedron
-            mesh.morphTargetInfluences[0] = Math.max(0, 1 - Math.abs(val - 0));
-            mesh.morphTargetInfluences[1] = Math.max(0, 1 - Math.abs(val - 1));
-            mesh.morphTargetInfluences[2] = Math.max(0, 1 - Math.abs(val - 2));
+        // --- Multi-Shape Interpolation ---
+        function applyMultiMorph(mesh, val) {
+            const totalTargets = 6;
+            for (let i = 0; i < totalTargets; i++) {
+                mesh.morphTargetInfluences[i] = Math.max(0, 1 - Math.abs(val - i));
+            }
         }
 
         const clock = new THREE.Clock();
@@ -421,15 +535,14 @@
             requestAnimationFrame(animate);
             const elapsed = clock.getElapsedTime();
 
-            // Compute morph state (cyclic 0 -> 1 -> 2 -> 0 if auto)
             let currentMorph = morphValue;
-            if (!manualMorph) {
-                currentMorph = (Math.sin(elapsed * 0.8) + 1); // Oscillates between 0 and 2 smoothly
+            if (autoMorph) {
+                currentMorph = (Math.sin(elapsed * 0.4) + 1) * 2.5; // Cycles across 0..5
             }
-            applyMorphState(coreMesh, currentMorph);
-            applyMorphState(innerMesh, (currentMorph + 1) % 2); // Offset inner core geometry
 
-            // Animate core rotations
+            applyMultiMorph(coreMesh, currentMorph);
+            applyMultiMorph(innerMesh, (currentMorph + 1.5) % 5);
+
             coreMesh.rotation.x = elapsed * speed * 0.3;
             coreMesh.rotation.y = elapsed * speed * 0.5;
             coreMesh.scale.setScalar(scale + Math.sin(elapsed * 3) * 0.15);
@@ -437,16 +550,13 @@
             innerMesh.rotation.x = -elapsed * speed * 0.6;
             innerMesh.rotation.z = elapsed * speed * 0.4;
 
-            // Animate vortex rings
             tunnelGroup.children.forEach((ring, idx) => {
                 ring.rotation.z = elapsed * speed * 0.4 + idx * (twist * 0.04);
                 ring.rotation.x = Math.sin(elapsed * 0.8 + idx * 0.08) * 0.25;
-
                 const currentHue = (ringMaterials[idx].baseHue + elapsed * 0.12) % 1.0;
                 ringMaterials[idx].mat.color.setHSL(currentHue, 1.0, 0.55);
             });
 
-            // Animate particle drift
             const positions = particleGeo.attributes.position.array;
             for (let i = 2; i < particleCount * 3; i += 3) {
                 positions[i] += speed * 0.2;
