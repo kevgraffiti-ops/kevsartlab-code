@@ -4,54 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kev's Art Lab</title>
+    <title>Kev's Art Lab - 3D Visual Hub</title>
     <style>
         body {
-            background: #08080c;
-            color: #00f0ff;
-            font-family: monospace;
+            background: #080810;
+            color: #00f3ff;
+            font-family: system-ui, sans-serif;
             padding: 40px;
-            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         h1 {
-            letter-spacing: 2px;
+            margin-bottom: 24px;
+            text-shadow: 0 0 10px #00f3ff;
         }
 
-        ul {
-            list-style: none;
-            padding: 0;
+        .engine-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            width: 100%;
+            max-width: 900px;
         }
 
-        li {
-            margin: 16px 0;
-        }
-
-        a {
-            color: #00ffaa;
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            padding: 20px;
+            border-radius: 8px;
             text-decoration: none;
-            font-size: 1.2rem;
+            color: #fff;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.2s;
         }
 
-        a:hover {
-            text-decoration: underline;
-            color: #ffffff;
+        .card:hover {
+            border-color: #00f3ff;
+            background: rgba(0, 243, 255, 0.15);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            transform: translateY(-2px);
         }
     </style>
 </head>
 
 <body>
-    <h1>KEV'S ART LAB // REPOSITORY</h1>
-    <p>Procedural Web Audio & Canvas Experiments:</p>
-    <ul>
-        <li><a href="reactive_tunnel.html">01. Reactive Tunnel (Synesthesia Studio)</a></li>
-        <li><a href="synthwave_grid.html">02. Synthwave Grid</a></li>
-        <li><a href="void_singularity.html">03. Void Singularity</a></li>
-        <li><a href="concrete_city.html">04. Concrete City</a></li>
-        <li><a href="graffiti_shatter.html">05. Kinetic Graffiti Shatter Cube</a></li>
-        <li><a href="graffiti_matrix.html">06. Graffiti Matrix</a></li>
-        <li><a href="graffiti_matrix_evolution.html">07. Graffiti Matrix Evolution</a></li>
-    </ul>
+    <h1>⚡ KEV'S 3D ART LAB</h1>
+    <div class="engine-grid">
+        <a class="card" href="engines/cyber_vortex.html">🌀 Cyber Vortex Hyper-Engine</a>
+        <a class="card" href="engines/breathing_cathedral.html">🏛️ Breathing Cathedral</a>
+        <a class="card" href="engines/eschermatrix.html">🧩 Escher Matrix</a>
+        <a class="card" href="engines/concrete_city.html">🏙️ Concrete City</a>
+    </div>
 </body>
 
 </html>
