@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Orbit Paradox — Kev's Art Lab</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #060810;
+            color: #edf7ff;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 28px;
+            padding: 20px;
+        }
+
+        canvas {
+            display: block;
+            height: min(90vh, 960px);
+            width: auto;
+            max-width: 94vw;
+            aspect-ratio: 9 / 16;
+            object-fit: contain;
+            background: #030710;
+            border: 1px solid #183045;
+            border-radius: 12px;
+            box-shadow: 0 20px 80px #0008;
+        }
+
+        aside {
+            width: min(320px, 94vw);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 30px;
+        }
+
+        .intro {
+            color: #9db1c6;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .control {
+            margin-bottom: 19px;
+        }
+
+        .control>label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 9px;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #00d9ff;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 36px;
+            padding: 2px;
+            background: #101a28;
+            border: 1px solid #29445c;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .colors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 14px 0;
+            font-size: 14px;
+        }
+
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 11px 14px;
+            border: 1px solid #31516c;
+            border-radius: 7px;
+            background: #102235;
+            color: white;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1b3b52;
+        }
+
+        button:disabled,
+        input:disabled {
+            opacity: .5;
+            cursor: default;
+        }
+
+        #record {
+            width: 100%;
+            border-color: #00d9ff;
+        }
+
+        #status {
+            color: #9db1c6;
+            font-size: 12px;
+            line-height: 1.6;
+            min-height: 40px;
+        }
+
+        .tip {
+            margin-top: 22px;
+            color: #b6ff00;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <canvas id="canvas" width="1080" height="1920" aria-label="A transparent neon ring of steps rotating in space">
+        </canvas>
+
+        <aside>
+            <h1>Orbit Paradox</h1>
+
+            <p class="intro">
+                The rotation stays constant. Try seeing the upper half
+                as the nearest half, then imagine the lower half is nearer.
+            </p>
+
+            <div class="control">
+                <label for="duration">
+                    Seconds per revolution
+                    <span id="durationValue">12</span>
+                </label>
+                <input id="duration" type="range" min="8" max="24" step="1" value="12">
+            </div>
+
+            <div class="control">
+                <label for="tilt">
+                    Viewing angle
+                    <span id="tiltValue">26°</span>
+                </label>
+                <input id="tilt" type="range" min="12" max="55" step="1" value="26">
+            </div>
+
+            <div class="control">
+                <label for="steps">
+                    Steps
+                    <span id="stepsValue">24</span>
+                </label>
+                <input id="steps" type="range" min="12" max="36" step="2" value="24">
+            </div>
+
+            <div class="control">
+                <label for="size">
+                    Size
+                    <span id="sizeValue">1.00</span>
+                </label>
+                <input id="size" type="range" min="0.65" max="1.15" step="0.01" value="1">
+            </div>
+
+            <div class="control">
+                <label for="glow">
+                    Glow
+                    <span id="glowValue">0.55</span>
+                </label>
+                <input id="glow" type="range" min="0" max="1" step="0.05" value="0.55">
+            </div>
+
+            <div class="colors">
+                <div class="control">
+                    <label for="colorA">Electric blue</label>
+                    <input id="colorA" type="color" value="#00d9ff">
+                </div>
+
+                <div class="control">
+                    <label for="colorB">Acid green</label>
+                    <input id="colorB" type="color" value="#b6ff00">
+                </div>
+            </div>
+
+            <label class="check">
+                <input id="marker" type="checkbox" checked>
+                Orange tracking step
+            </label>
+
+            <label class="check">
+                <input id="stars" type="checkbox" checked>
+                Background stars
+            </label>
+
+            <div class="buttons">
+                <button id="pause">Pause</button>
+                <button id="restart">Restart</button>
+                <button id="reset">Reset look</button>
+                <button id="record">Record silent loop</button>
+            </div>
+
+            <p id="status">
+                1080 × 1920 · Silent WebM export · Target 30 FPS
+            </p>
+
+            <p class="tip">
+                Trouble seeing the flip? Pause, reinterpret which half
+                is closer, then play. Try switching off the orange step.
+            </p>
+        </aside>
+    </main>
+
+    <script>
+        "use strict";
+
+        /* =========================================================
+           DEFAULT LOOK
+           Change these defaults for your own variations.
+           ========================================================= */
+
+        const DEFAULTS = {
+            duration: 18,
+            tilt: 20,
+            steps: 12,
+            size: 1,
+            glow: 0,
+
+            colorA: "#FFFFFF",
+            colorB: "#FFFFFF",
+            markerColor: "#FFFFFF",
+
+            marker: false,
+            stars: false,
+
+            background: "#030710",
+            fps: 30,
+            bitrate: 18000000
+        };
+        const settings = { ...DEFAULTS };
+
+        /* =========================================================
+           CANVAS
+           The drawing buffer always remains 1080 × 1920.
+           CSS only changes the preview size.
+           ========================================================= */
+
+        const canvas = document.getElementById("canvas");
+        canvas.width = 1080;
+        canvas.height = 1920;
+
+        const ctx = canvas.getContext("2d", { alpha: false });
+
+        if (!ctx) {
+            throw new Error("Canvas 2D is unavailable.");
+        }
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const TAU = Math.PI * 2;
+
+        const pauseButton = document.getElementById("pause");
+        const restartButton = document.getElementById("restart");
+        const resetButton = document.getElementById("reset");
+        const recordButton = document.getElementById("record");
+        const status = document.getElementById("status");
+
+        const inputs = [...document.querySelectorAll("input")];
+
+        let paused = false;
+        let recording = false;
+        let turns = 0;
+        let previousTime = performance.now();
+
+        /* =========================================================
+           SMALL HELPERS
+           ========================================================= */
+
+        function random(seed) {
+            const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+            return value - Math.floor(value);
+        }
+
+        function radians(degrees) {
+            return degrees * Math.PI / 180;
+        }
+
+        /* =========================================================
+           STATIC SPACE BACKGROUND
+           Stars do not move, so they don't reveal the object's depth.
+           ========================================================= */
+
+        const background = document.createElement("canvas");
+        background.width = W;
+        background.height = H;
+
+        const bg = background.getContext("2d");
+
+        function buildBackground() {
+            bg.fillStyle = settings.background;
+            bg.fillRect(0, 0, W, H);
+
+            const halo = bg.createRadialGradient(
+                W / 2, H / 2, 80,
+                W / 2, H / 2, 780
+            );
+
+            halo.addColorStop(0, "#0a1c2b");
+            halo.addColorStop(0.55, "#06111d");
+            halo.addColorStop(1, settings.background);
+
+            bg.fillStyle = halo;
+            bg.fillRect(0, 0, W, H);
+
+            if (settings.stars) {
+                for (let i = 0; i < 100; i++) {
+                    const x = random(i + 90) * W;
+                    const y = random(i + 420) * H;
+                    const radius = 0.55 + random(i + 720) * 1.1;
+
+                    bg.globalAlpha = 0.12 + random(i + 220) * 0.28;
+                    bg.fillStyle = "#b7d9ee";
+                    bg.beginPath();
+                    bg.arc(x, y, radius, 0, TAU);
+                    bg.fill();
+                }
+            }
+
+            bg.globalAlpha = 1;
+        }
+
+        /* =========================================================
+           GEOMETRY
+           Each step is a small transparent wedge-shaped block.
+        
+           The height follows a periodic wave rather than ending
+           at a different height. This keeps the structure closed.
+           ========================================================= */
+
+        let steps = [];
+
+        const EDGE_PAIRS = [
+            [0, 1], [1, 2], [2, 3], [3, 0],
+            [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7]
+        ];
+
+        function buildGeometry() {
+            steps = [];
+
+            const count = settings.steps;
+            const segment = TAU / count;
+
+            const innerRadius = 2.75;
+            const outerRadius = 4.05;
+            const thickness = 0.24;
+
+            for (let i = 0; i < count; i++) {
+                const angle = i * segment;
+
+                // Small gaps separate the steps.
+                const start = angle - segment * 0.40;
+                const end = angle + segment * 0.40;
+
+                // Rising and falling sections create a staircase rhythm.
+                const height = 0;
+                const top = height + thickness / 2;
+                const bottom = height - thickness / 2;
+
+                const point = (radius, a, z) => [
+                    Math.cos(a) * radius,
+                    Math.sin(a) * radius,
+                    z
+                ];
+
+                steps.push({
+                    index: i,
+                    vertices: [
+                        point(innerRadius, start, bottom),
+                        point(outerRadius, start, bottom),
+                        point(outerRadius, end, bottom),
+                        point(innerRadius, end, bottom),
+
+                        point(innerRadius, start, top),
+                        point(outerRadius, start, top),
+                        point(outerRadius, end, top),
+                        point(innerRadius, end, top)
+                    ]
+                });
+            }
+        }
+
+        /* =========================================================
+           PROJECTION
+           Orthographic projection deliberately avoids perspective:
+           distant steps do not become smaller or dimmer.
+           ========================================================= */
+
+        function project(point, rotation) {
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+
+            const x = point[0] * cos - point[1] * sin;
+            const y = point[0] * sin + point[1] * cos;
+            const z = point[2];
+
+            const tilt = radians(settings.tilt);
+
+            const screenY =
+                y * Math.sin(tilt) - z * Math.cos(tilt);
+
+            const scale = 105 * settings.size;
+
+            // A fixed diagonal composition uses more of the vertical frame.
+            const bank = radians(-25);
+            const bx = x * Math.cos(bank) - screenY * Math.sin(bank);
+            const by = x * Math.sin(bank) + screenY * Math.cos(bank);
+
+            return [
+                W / 2 + bx * scale,
+                H / 2 + by * scale
+            ];
+        }
+
+        function appendStep(path, vertices, rotation) {
+            const points = vertices.map(point => project(point, rotation));
+
+            for (const [a, b] of EDGE_PAIRS) {
+                path.moveTo(points[a][0], points[a][1]);
+                path.lineTo(points[b][0], points[b][1]);
+            }
+        }
+
+        /* =========================================================
+           DRAWING
+           No filled faces, hidden edges, shadows or depth sorting.
+           Additive lines reduce front/back overlap cues.
+           ========================================================= */
+
+        function render() {
+            ctx.drawImage(background, 0, 0);
+
+            const rotation = (turns % 1) * TAU;
+
+            const bluePath = new Path2D();
+            const greenPath = new Path2D();
+            const orangePath = new Path2D();
+
+            for (const step of steps) {
+                let path;
+
+                if (step.index === 0 && settings.marker) {
+                    path = orangePath;
+                } else {
+                    path = step.index % 2 === 0 ? bluePath : greenPath;
+                }
+
+                appendStep(path, step.vertices, rotation);
+            }
+
+            const groups = [
+                [bluePath, settings.colorA],
+                [greenPath, settings.colorB],
+                [orangePath, settings.markerColor]
+            ];
+
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+
+            // Broad glow, drawn without costly blur filters.
+            if (settings.glow > 0) {
+                for (const [path, color] of groups) {
+                    ctx.strokeStyle = color;
+
+                    ctx.globalAlpha = 0.035 * settings.glow;
+                    ctx.lineWidth = 22;
+                    ctx.stroke(path);
+
+                    ctx.globalAlpha = 0.09 * settings.glow;
+                    ctx.lineWidth = 10;
+                    ctx.stroke(path);
+                }
+            }
+
+            // Fine coloured geometry.
+            ctx.globalAlpha = 0.88;
+            ctx.lineWidth = 2.5;
+
+            for (const [path, color] of groups) {
+                ctx.strokeStyle = color;
+                ctx.stroke(path);
+            }
+
+            // Subtle bright core.
+            ctx.globalAlpha = 0.20;
+            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = "#eaffff";
+
+            for (const [path] of groups) {
+                ctx.stroke(path);
+            }
+
+            ctx.restore();
+        }
+
+        /* =========================================================
+           PLAYBACK
+           Only the forward phase increases.
+           There is no programmed direction reversal.
+           ========================================================= */
+
+        function animate(now) {
+            const delta = (now - previousTime) / 1000;
+            previousTime = now;
+
+            if (!paused) {
+                turns = (turns + delta / settings.duration) % 1;
+            }
+
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        pauseButton.addEventListener("click", () => {
+            if (recording) return;
+
+            paused = !paused;
+            previousTime = performance.now();
+            pauseButton.textContent = paused ? "Play" : "Pause";
+        });
+
+        restartButton.addEventListener("click", () => {
+            if (recording) return;
+
+            turns = 0;
+            previousTime = performance.now();
+            render();
+        });
+
+        /* =========================================================
+           LIVE CONTROLS
+           ========================================================= */
+
+        function refreshControls() {
+            for (const key of [
+                "duration", "tilt", "steps", "size", "glow",
+                "colorA", "colorB"
+            ]) {
+                document.getElementById(key).value = settings[key];
+            }
+
+            document.getElementById("marker").checked = settings.marker;
+            document.getElementById("stars").checked = settings.stars;
+
+            document.getElementById("durationValue").textContent =
+                settings.duration;
+
+            document.getElementById("tiltValue").textContent =
+                settings.tilt + "°";
+
+            document.getElementById("stepsValue").textContent =
+                settings.steps;
+
+            document.getElementById("sizeValue").textContent =
+                settings.size.toFixed(2);
+
+            document.getElementById("glowValue").textContent =
+                settings.glow.toFixed(2);
+        }
+
+        for (const key of ["duration", "tilt", "steps", "size", "glow"]) {
+            document.getElementById(key).addEventListener("input", event => {
+                settings[key] = Number(event.target.value);
+
+                if (key === "steps") buildGeometry();
+
+                refreshControls();
+                render();
+            });
+        }
+
+        for (const key of ["colorA", "colorB"]) {
+            document.getElementById(key).addEventListener("input", event => {
+                settings[key] = event.target.value;
+                render();
+            });
+        }
+
+        document.getElementById("marker").addEventListener("change", event => {
+            settings.marker = event.target.checked;
+            render();
+        });
+
+        document.getElementById("stars").addEventListener("change", event => {
+            settings.stars = event.target.checked;
+            buildBackground();
+            render();
+        });
+
+        resetButton.addEventListener("click", () => {
+            if (recording) return;
+
+            Object.assign(settings, DEFAULTS);
+            turns = 0;
+
+            refreshControls();
+            buildGeometry();
+            buildBackground();
+            render();
+        });
+
+        /* =========================================================
+           SILENT WEBM RECORDING
+           Captures one complete revolution from the beginning.
+           Browser timing may introduce small duration differences.
+           ========================================================= */
+
+        recordButton.addEventListener("click", () => {
+            if (recording) return;
+
+            if (!window.MediaRecorder || !canvas.captureStream) {
+                status.textContent =
+                    "Recording is unavailable. Try a current Chrome or Edge browser.";
+                return;
+            }
+
+            const mimeType = [
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ].find(type => MediaRecorder.isTypeSupported(type));
+
+            if (!mimeType) {
+                status.textContent = "WebM recording is unavailable in this browser.";
+                return;
+            }
+
+            let stream;
+            let recorder;
+            let timer;
+            let failed = false;
+            let hidden = false;
+
+            const chunks = [];
+
+            function watchVisibility() {
+                if (document.hidden) hidden = true;
+            }
+
+            function cleanup() {
+                clearTimeout(timer);
+                document.removeEventListener("visibilitychange", watchVisibility);
+
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
+                recording = false;
+
+                inputs.forEach(input => input.disabled = false);
+                pauseButton.disabled = false;
+                restartButton.disabled = false;
+                resetButton.disabled = false;
+                recordButton.disabled = false;
+                recordButton.textContent = "Record silent loop";
+            }
+
+            try {
+                paused = false;
+                pauseButton.textContent = "Pause";
+                turns = 0;
+                render();
+
+                stream = canvas.captureStream(settings.fps);
+
+                recorder = new MediaRecorder(stream, {
+                    mimeType,
+                    videoBitsPerSecond: settings.bitrate
+                });
+
+                recorder.ondataavailable = event => {
+                    if (event.data.size) chunks.push(event.data);
+                };
+
+                recorder.onerror = () => {
+                    failed = true;
+                    status.textContent = "Recording failed. Please try again.";
+                    cleanup();
+                };
+
+                recorder.onstop = () => {
+                    if (!failed && chunks.length) {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+
+                        link.href = url;
+                        link.download = "kevs-art-lab-orbit-paradox.webm";
+
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+                        status.textContent = hidden
+                            ? "Downloaded. The tab was hidden; check the video for skipped frames."
+                            : "Downloaded: silent 1080 × 1920 WebM.";
+                    }
+
+                    cleanup();
+                };
+
+                recording = true;
+
+                inputs.forEach(input => input.disabled = true);
+                pauseButton.disabled = true;
+                restartButton.disabled = true;
+                resetButton.disabled = true;
+                recordButton.disabled = true;
+                recordButton.textContent = "Recording…";
+
+                status.textContent =
+                    `Recording ${settings.duration} seconds. Keep this tab visible.`;
+
+                document.addEventListener("visibilitychange", watchVisibility);
+
+                turns = 0;
+                previousTime = performance.now();
+                recorder.start();
+
+                timer = setTimeout(() => {
+                    if (recorder.state === "recording") recorder.stop();
+                }, settings.duration * 1000);
+
+            } catch (error) {
+                cleanup();
+                status.textContent = `Could not record: ${error.message}`;
+            }
+        });
+
+        /* Start */
+        refreshControls();
+        buildBackground();
+        buildGeometry();
+        render();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+
+</html>

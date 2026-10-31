@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Breathing Cathedral — Kev’s Art Lab</title>
+
+    <style>
+        :root {
+            color-scheme: dark;
+            --accent: #7cecff;
+            --background: #080b10;
+            --panel: #111821;
+            --border: #293746;
+            --text: #edf7ff;
+            --muted: #94a9b9;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--background);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        main {
+            min-height: 100svh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(24px, 5vw, 70px);
+            padding: 24px;
+        }
+
+        .stage {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        #art {
+            display: block;
+            width: min(48vw, calc(88svh * 9 / 16));
+            height: auto;
+            aspect-ratio: 9 / 16;
+            background: #000;
+            border: 1px solid var(--border);
+        }
+
+        aside {
+            width: 350px;
+            max-width: 100%;
+        }
+
+        .eyebrow {
+            margin-bottom: 15px;
+            color: #ffbe65;
+            font-size: 10px;
+            letter-spacing: 3px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-family: Georgia, serif;
+            font-size: 39px;
+            font-weight: normal;
+            line-height: 1.08;
+            letter-spacing: -1px;
+        }
+
+        p {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.65;
+        }
+
+        .presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 7px;
+            margin: 20px 0;
+        }
+
+        button,
+        select {
+            color: var(--text);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 11px 10px;
+            font: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            border-color: var(--accent);
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+            outline: 2px solid #ffbe65;
+            outline-offset: 3px;
+        }
+
+        .presets button {
+            padding: 10px 4px;
+            font-size: 10px;
+        }
+
+        .control {
+            margin: 16px 0;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        output {
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            margin: 0;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 34px;
+            padding: 2px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        select {
+            width: 100%;
+        }
+
+        .colours {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .check {
+            justify-content: flex-start;
+            margin: 15px 0;
+            color: #bbccd8;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        #record,
+        #cancel {
+            grid-column: 1 / -1;
+            background: #0d2932;
+            border-color: #267386;
+        }
+
+        #cancel {
+            border-color: #ffbe65;
+        }
+
+        #status {
+            min-height: 44px;
+            font-size: 11px;
+            margin-bottom: 0;
+        }
+
+        details {
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            margin-top: 15px;
+        }
+
+        summary {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        :disabled {
+            opacity: .45;
+            cursor: default;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        @media (max-width: 760px) {
+            main {
+                flex-direction: column;
+                padding: 18px;
+                gap: 24px;
+            }
+
+            #art {
+                width: min(92vw, calc(78svh * 9 / 16));
+            }
+
+            aside {
+                width: min(420px, 100%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <div class="stage">
+            <canvas id="art" width="1080" height="1920" role="img"
+                aria-label="A luminous ribbed flower opens into a floating cathedral and folds closed">
+            </canvas>
+        </div>
+
+        <aside>
+            <div class="eyebrow">
+                KEV’S LOOP STUDIO / IMPOSSIBLE GARDENS / 01
+            </div>
+
+            <h1>The Breathing<br>Cathedral</h1>
+
+            <p>
+                A flower made from light.
+                Watch its ribs unfold into a floating vault,
+                then gather back into a bud.
+            </p>
+
+            <div class="presets">
+                <button type="button" data-preset="electric">Electric / amber</button>
+                <button type="button" data-preset="garden">Lime / cyan</button>
+                <button type="button" data-preset="solar">Orange / ivory</button>
+            </div>
+
+            <div class="control">
+                <label for="duration">
+                    Loop duration <output id="durationValue"></output>
+                </label>
+                <input id="duration" type="range" min="8" max="24" step="2">
+            </div>
+
+            <div class="control">
+                <label for="petals">
+                    Architectural petals <output id="petalsValue"></output>
+                </label>
+                <input id="petals" type="range" min="6" max="16" step="1">
+            </div>
+
+            <div class="control">
+                <label for="bloom">
+                    Opening strength <output id="bloomValue"></output>
+                </label>
+                <input id="bloom" type="range" min="0.45" max="1.15" step="0.05">
+            </div>
+
+            <div class="control">
+                <label for="twist">
+                    Spiral twist <output id="twistValue"></output>
+                </label>
+                <input id="twist" type="range" min="0" max="1" step="0.05">
+            </div>
+
+            <div class="control">
+                <label for="size">
+                    Sculpture size <output id="sizeValue"></output>
+                </label>
+                <input id="size" type="range" min="0.70" max="1.12" step="0.01">
+            </div>
+
+            <div class="control">
+                <label for="glow">
+                    Light intensity <output id="glowValue"></output>
+                </label>
+                <input id="glow" type="range" min="0" max="1" step="0.05">
+            </div>
+
+            <div class="colours">
+                <div class="control">
+                    <label for="colourA">Structure</label>
+                    <input id="colourA" type="color">
+                </div>
+
+                <div class="control">
+                    <label for="colourB">Energy</label>
+                    <input id="colourB" type="color">
+                </div>
+
+                <div class="control">
+                    <label for="background">Backdrop</label>
+                    <input id="background" type="color">
+                </div>
+            </div>
+
+            <div class="control">
+                <label for="quality">Preview quality</label>
+                <select id="quality">
+                    <option value="draft">Draft — lighter on the laptop</option>
+                    <option value="full">Full — finer ribs and particles</option>
+                </select>
+            </div>
+
+            <label class="check">
+                <input id="orbit" type="checkbox">
+                Gentle camera orbit
+            </label>
+
+            <label class="check">
+                <input id="stars" type="checkbox">
+                Floating dust
+            </label>
+
+            <div class="buttons">
+                <button id="pause" type="button">Pause</button>
+                <button id="restart" type="button">Restart</button>
+                <button id="saveLook" type="button">Save this look</button>
+                <button id="loadLook" type="button">Load saved look</button>
+                <button id="cover" type="button">Save cover PNG</button>
+                <button id="reset" type="button">Reset</button>
+                <button id="record" type="button">Record silent loop</button>
+                <button id="cancel" type="button" hidden>Cancel recording</button>
+            </div>
+
+            <p id="status" role="status" aria-live="polite">
+                1080 × 1920 · Silent · Target 30 FPS
+            </p>
+
+            <details>
+                <summary>How to use this template</summary>
+                <p>
+                    Choose a palette, adjust the shape and save your look.
+                    Cover export captures the open sculpture.
+                    Recording uses full detail and contains only the artwork.
+                    Keep this tab visible until it finishes.
+                </p>
+                <p>
+                    MP4 is used when supported by your browser; otherwise WebM.
+                    Recording happens in real time, so performance and exact
+                    file duration depend on your browser and computer.
+                </p>
+            </details>
+        </aside>
+    </main>
+
+    <script>
+        "use strict";
+
+        (() => {
+            /* =========================================================
+               YOUR DEFAULT LOOK
+               Change these values to customise the starting appearance.
+               ========================================================= */
+
+            const DEFAULTS = {
+                duration: 16,
+                petals: 10,
+                bloom: 4,
+                twist: 0.95,
+                size: 3,
+                glow: 0.85,
+                colourA: "#00d9ff",
+                colourB: "#ffb000",
+                background: "#020508",
+                quality: "full",
+                orbit: true,
+                stars: true
+            };
+
+            const PALETTES = {
+                electric: ["#00d9ff", "#ffb000", "#020508"],
+                garden: ["#b6ff00", "#00d9ff", "#020806"],
+                solar: ["#ff7900", "#fff1c9", "#080402"]
+            };
+
+            const STORAGE_KEY = "kevs-loop-studio-cathedral-v1";
+
+            const WIDTH = 1080;
+            const HEIGHT = 1920;
+            const FPS = 30;
+            const TAU = Math.PI * 2;
+
+            const settings = { ...DEFAULTS };
+            const canvas = document.getElementById("art");
+
+            // The drawing buffer always stays at export resolution.
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+
+            const ctx = canvas.getContext("2d", { alpha: false });
+            const status = document.getElementById("status");
+
+            if (!ctx) {
+                status.textContent = "Canvas 2D is unavailable in this browser.";
+                return;
+            }
+
+            const keys = Object.keys(DEFAULTS);
+            const controls = Object.fromEntries(
+                keys.map(key => [key, document.getElementById(key)])
+            );
+
+            const pauseButton = document.getElementById("pause");
+            const recordButton = document.getElementById("record");
+            const cancelButton = document.getElementById("cancel");
+
+            const lockable = [
+                ...document.querySelectorAll("input, select"),
+                ...document.querySelectorAll("button:not(#cancel)")
+            ];
+
+            let phase = 0;
+            let previous = performance.now();
+            let lastDraw = -Infinity;
+            let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+            let recording = null;
+
+            let rgbA;
+            let rgbB;
+            let spriteA;
+            let spriteB;
+            let halo;
+            let dust = [];
+
+            function clamp(value, low, high) {
+                return Math.max(low, Math.min(high, value));
+            }
+
+            function randomGenerator(seed) {
+                return () => {
+                    seed |= 0;
+                    seed = (seed + 0x6D2B79F5) | 0;
+
+                    let n = Math.imul(seed ^ seed >>> 15, 1 | seed);
+                    n ^= n + Math.imul(n ^ n >>> 7, 61 | n);
+
+                    return ((n ^ n >>> 14) >>> 0) / 4294967296;
+                };
+            }
+
+            function rgb(hex) {
+                return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+            }
+
+            function rgba(colour, alpha) {
+                return `rgba(${colour[0]},${colour[1]},${colour[2]},${alpha})`;
+            }
+
+            function makeSprite(colour) {
+                const sprite = document.createElement("canvas");
+                sprite.width = sprite.height = 48;
+
+                const s = sprite.getContext("2d");
+                const gradient = s.createRadialGradient(24, 24, 0, 24, 24, 24);
+
+                gradient.addColorStop(0, "rgba(255,255,255,1)");
+                gradient.addColorStop(.08, rgba(colour, 1));
+                gradient.addColorStop(.23, rgba(colour, .50));
+                gradient.addColorStop(.55, rgba(colour, .10));
+                gradient.addColorStop(1, rgba(colour, 0));
+
+                s.fillStyle = gradient;
+                s.fillRect(0, 0, 48, 48);
+
+                return sprite;
+            }
+
+            function buildColours() {
+                rgbA = rgb(settings.colourA);
+                rgbB = rgb(settings.colourB);
+                spriteA = makeSprite(rgbA);
+                spriteB = makeSprite(rgbB);
+
+                halo = document.createElement("canvas");
+                halo.width = halo.height = 384;
+
+                const h = halo.getContext("2d");
+                const gradient = h.createRadialGradient(192, 192, 0, 192, 192, 192);
+
+                gradient.addColorStop(0, rgba(rgbA, .09));
+                gradient.addColorStop(.35, rgba(rgbA, .035));
+                gradient.addColorStop(1, rgba(rgbA, 0));
+
+                h.fillStyle = gradient;
+                h.fillRect(0, 0, 384, 384);
+            }
+
+            function buildDust() {
+                const random = randomGenerator(80131);
+
+                dust = Array.from({ length: 150 }, () => ({
+                    x: random() * WIDTH,
+                    y: random() * HEIGHT,
+                    radius: .5 + random() * 1.2,
+                    alpha: .08 + random() * .24,
+                    phase: random() * TAU,
+                    drift: 6 + random() * 18
+                }));
+            }
+
+            /* =========================================================
+               SCENE GEOMETRY
+               Every movement is derived from one repeating loop phase.
+               ========================================================= */
+
+            function sceneState(turn) {
+                const p = ((turn % 1) + 1) % 1;
+                const theta = p * TAU;
+
+                // Closed at phase 0, fully open at phase 0.5.
+                const breath = .5 - .5 * Math.cos(theta);
+                const opening = Math.pow(breath, .85) * settings.bloom;
+
+                return {
+                    theta,
+                    opening,
+                    yaw: settings.orbit
+                        ? .28 + .38 * Math.sin(theta)
+                        : .28,
+                    pitch: .32 + .035 * Math.cos(theta),
+                    float: .055 * Math.sin(theta),
+                    size: 300 * settings.size
+                };
+            }
+
+            function surface(petal, across, t, frame) {
+                const count = settings.petals;
+                const baseAngle = petal / count * TAU;
+                const fan = Math.sin(Math.PI * t);
+
+                // A narrow bud becomes a flared, ribbed flower.
+                const radius =
+                    .09 +
+                    fan * (.32 + frame.opening * 1.00) +
+                    frame.opening * .78 * t * t * t;
+
+                const y =
+                    1.12 -
+                    2.38 * t +
+                    frame.opening * .92 * t * t +
+                    frame.float;
+
+                // Each petal has width and a gently folded surface.
+                const width =
+                    (Math.PI / count) *
+                    (.18 + .78 * fan) *
+                    across;
+
+                const spiral =
+                    settings.twist *
+                    (.40 + .25 * frame.opening) *
+                    Math.sin(Math.PI * t);
+
+                const angle = baseAngle + width + spiral;
+
+                const pleat =
+                    .055 *
+                    Math.sin(Math.PI * t) *
+                    (1 - across * across) *
+                    frame.opening;
+
+                return {
+                    x: Math.cos(angle) * (radius + pleat),
+                    y: y - pleat * .5,
+                    z: Math.sin(angle) * (radius + pleat)
+                };
+            }
+
+            function project(point, frame) {
+                const cy = Math.cos(frame.yaw);
+                const sy = Math.sin(frame.yaw);
+                const cp = Math.cos(frame.pitch);
+                const sp = Math.sin(frame.pitch);
+
+                const x = point.x * cy + point.z * sy;
+                const z = -point.x * sy + point.z * cy;
+
+                const y2 = point.y * cp - z * sp;
+                const z2 = point.y * sp + z * cp;
+
+                const perspective = 5 / (5 - z2);
+
+                return {
+                    x: WIDTH / 2 + x * frame.size * perspective,
+                    y: HEIGHT / 2 + y2 * frame.size * perspective,
+                    z: z2,
+                    scale: perspective
+                };
+            }
+
+            function strokePath(points, colour, alpha, width, glow) {
+                if (!points.length) return;
+
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+
+                if (glow > 0) {
+                    ctx.strokeStyle = rgba(colour, alpha * .075 * glow);
+                    ctx.lineWidth = width + 9 * glow;
+                    ctx.stroke();
+
+                    ctx.strokeStyle = rgba(colour, alpha * .15 * glow);
+                    ctx.lineWidth = width + 3.5 * glow;
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = rgba(colour, alpha);
+                ctx.lineWidth = width;
+                ctx.stroke();
+            }
+
+            function drawParticle(point, sprite, radius, alpha) {
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(
+                    sprite,
+                    point.x - radius,
+                    point.y - radius,
+                    radius * 2,
+                    radius * 2
+                );
+            }
+
+            function render(turn = phase, fullDetail = false) {
+                const frame = sceneState(turn);
+                const full = fullDetail || settings.quality === "full";
+                const ribs = full ? 11 : 7;
+                const steps = full ? 54 : 34;
+                const crossbars = full ? 14 : 9;
+
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = "source-over";
+                ctx.fillStyle = settings.background;
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+                // Soft atmosphere, with no image assets or external textures.
+                ctx.drawImage(halo, 40, 380, 1000, 1120);
+
+                if (settings.stars) {
+                    for (const d of dust) {
+                        const x = d.x + Math.sin(frame.theta + d.phase) * d.drift;
+                        const y = d.y + Math.cos(frame.theta + d.phase) * d.drift;
+                        const alpha = d.alpha * (.7 + .3 * Math.sin(frame.theta + d.phase));
+
+                        ctx.fillStyle = rgba(rgbA, alpha);
+                        ctx.beginPath();
+                        ctx.arc(x, y, d.radius, 0, TAU);
+                        ctx.fill();
+                    }
+                }
+
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+
+                // Draw rear petals first.
+                const order = Array.from(
+                    { length: settings.petals },
+                    (_, i) => ({
+                        petal: i,
+                        depth: project(surface(i, 0, .55, frame), frame).z
+                    })
+                ).sort((a, b) => a.depth - b.depth);
+
+                for (const item of order) {
+                    const petal = item.petal;
+                    const brightness = clamp(.48 + item.depth * .15, .26, .82);
+
+                    // Long architectural ribs.
+                    for (let rib = 0; rib < ribs; rib++) {
+                        const across = rib / (ribs - 1) * 2 - 1;
+                        const points = [];
+
+                        for (let j = 0; j <= steps; j++) {
+                            points.push(
+                                project(surface(petal, across, j / steps, frame), frame)
+                            );
+                        }
+
+                        const boundary = rib === 0 || rib === ribs - 1;
+                        const centre = rib === Math.floor(ribs / 2);
+                        const highlight = boundary || centre;
+
+                        strokePath(
+                            points,
+                            boundary ? rgbB : rgbA,
+                            brightness * (highlight ? 1 : .48),
+                            highlight ? 1.75 : .85,
+                            highlight ? settings.glow : settings.glow * .30
+                        );
+                    }
+
+                    // Crossbars make each petal read as a vaulted structure.
+                    for (let bar = 1; bar < crossbars; bar++) {
+                        const t = bar / crossbars;
+                        const points = [];
+
+                        for (let j = 0; j <= 12; j++) {
+                            points.push(
+                                project(surface(petal, j / 12 * 2 - 1, t, frame), frame)
+                            );
+                        }
+
+                        strokePath(
+                            points,
+                            rgbA,
+                            brightness * .27,
+                            .8,
+                            0
+                        );
+                    }
+
+                    // Lights travel along closed out-and-back paths.
+                    // They do not teleport at the loop boundary.
+                    const lights = full ? 9 : 5;
+
+                    for (let i = 0; i < lights; i++) {
+                        const offset = petal / settings.petals * TAU + i * 1.7;
+                        const t = .05 + .90 * (
+                            .5 - .5 * Math.cos(frame.theta + offset)
+                        );
+
+                        const across = Math.sin(i * 2.3 + petal) * .80;
+                        const point = project(surface(petal, across, t, frame), frame);
+                        const pulse = .6 + .4 * Math.sin(frame.theta + offset) ** 2;
+
+                        drawParticle(
+                            point,
+                            i % 2 ? spriteA : spriteB,
+                            (5 + settings.glow * 5) * point.scale,
+                            pulse * .85
+                        );
+                    }
+
+                    // A jewel at the tip of each petal.
+                    const tip = project(surface(petal, 0, 1, frame), frame);
+
+                    drawParticle(
+                        tip,
+                        spriteB,
+                        (8 + settings.glow * 7) * tip.scale,
+                        .85
+                    );
+
+                    ctx.globalAlpha = 1;
+                }
+
+                // A small suspended seed below the structure.
+                const seed = project(
+                    { x: 0, y: 1.20 + frame.float, z: 0 },
+                    frame
+                );
+
+                drawParticle(seed, spriteB, 20 + settings.glow * 15, .90);
+
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
+
+            /* =========================================================
+               CONTROLS AND SAVED LOOKS
+               ========================================================= */
+
+            function syncControls() {
+                for (const key of keys) {
+                    const input = controls[key];
+
+                    if (input.type === "checkbox") {
+                        input.checked = settings[key];
+                    } else {
+                        input.value = settings[key];
+                    }
+
+                    const output = document.getElementById(key + "Value");
+
+                    if (output) {
+                        output.textContent =
+                            key === "duration" ? settings[key] + " s" :
+                                key === "petals" ? settings[key] :
+                                    settings[key].toFixed(2);
+                    }
+                }
+
+                pauseButton.textContent = paused ? "Play" : "Pause";
+            }
+
+            function applySettings(saved) {
+                for (const key of keys) {
+                    const input = controls[key];
+                    const value = saved[key];
+
+                    if (input.type === "range") {
+                        if (typeof value !== "number" || !Number.isFinite(value)) continue;
+
+                        const min = Number(input.min);
+                        const max = Number(input.max);
+                        const step = Number(input.step);
+
+                        settings[key] = clamp(
+                            min + Math.round((value - min) / step) * step,
+                            min,
+                            max
+                        );
+
+                    } else if (input.type === "color") {
+                        if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) {
+                            settings[key] = value;
+                        }
+
+                    } else if (input.type === "checkbox") {
+                        if (typeof value === "boolean") settings[key] = value;
+
+                    } else if (key === "quality") {
+                        if (value === "draft" || value === "full") settings[key] = value;
+                    }
+                }
+
+                buildColours();
+                syncControls();
+                render();
+            }
+
+            for (const key of keys) {
+                controls[key].addEventListener("input", () => {
+                    const input = controls[key];
+
+                    settings[key] =
+                        input.type === "checkbox" ? input.checked :
+                            input.type === "range" ? Number(input.value) :
+                                input.value;
+
+                    if (["colourA", "colourB"].includes(key)) buildColours();
+
+                    syncControls();
+                    render();
+                });
+            }
+
+            document.querySelectorAll("[data-preset]").forEach(button => {
+                button.onclick = () => {
+                    const palette = PALETTES[button.dataset.preset];
+
+                    settings.colourA = palette[0];
+                    settings.colourB = palette[1];
+                    settings.background = palette[2];
+
+                    buildColours();
+                    syncControls();
+                    render();
+                };
+            });
+
+            pauseButton.onclick = () => {
+                paused = !paused;
+                previous = performance.now();
+                syncControls();
+            };
+
+            document.getElementById("restart").onclick = () => {
+                phase = 0;
+                previous = performance.now();
+                render();
+            };
+
+            document.getElementById("reset").onclick = () => {
+                Object.assign(settings, DEFAULTS);
+                phase = 0;
+
+                buildColours();
+                syncControls();
+                render();
+
+                status.textContent = "Default look restored.";
+            };
+
+            document.getElementById("saveLook").onclick = () => {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+                    status.textContent = "Look saved in this browser.";
+                } catch {
+                    status.textContent = "Browser storage is unavailable.";
+                }
+            };
+
+            document.getElementById("loadLook").onclick = () => {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+
+                    if (!saved || typeof saved !== "object") {
+                        status.textContent = "No saved look yet. Use Save this look first.";
+                        return;
+                    }
+
+                    applySettings(saved);
+                    status.textContent = "Saved look loaded.";
+                } catch {
+                    status.textContent = "Could not load the saved look.";
+                }
+            };
+
+            function download(blob, filename) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+
+                link.href = url;
+                link.download = filename;
+
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            }
+
+            document.getElementById("cover").onclick = () => {
+                const cover = document.createElement("canvas");
+
+                cover.width = WIDTH;
+                cover.height = HEIGHT;
+
+                // Capture the fully open sculpture in full detail.
+                render(.5, true);
+                cover.getContext("2d").drawImage(canvas, 0, 0);
+
+                // Restore the actual playback position.
+                render();
+
+                cover.toBlob(blob => {
+                    if (!blob) {
+                        status.textContent = "Could not save the cover. Please try again.";
+                        return;
+                    }
+
+                    download(blob, "kevs-art-lab-breathing-cathedral-cover.png");
+                    status.textContent = "Cover saved. Check its crop before posting.";
+                }, "image/png");
+            };
+
+            /* =========================================================
+               SILENT VIDEO RECORDING
+               Only the canvas is captured. No audio APIs are used.
+               ========================================================= */
+
+            recordButton.onclick = () => {
+                if (recording) return;
+
+                if (!window.MediaRecorder || !canvas.captureStream) {
+                    status.textContent = "Recording is unavailable. Try Chrome or Edge.";
+                    return;
+                }
+
+                const mimeType = [
+                    "video/mp4;codecs=avc1.42001E",
+                    "video/mp4",
+                    "video/webm;codecs=vp8",
+                    "video/webm"
+                ].find(type => MediaRecorder.isTypeSupported(type));
+
+                if (!mimeType) {
+                    status.textContent = "No supported recording format was found.";
+                    return;
+                }
+
+                const chunks = [];
+                const wasPaused = paused;
+
+                let stream;
+                let recorder;
+                let timer;
+                let cancelled = false;
+                let failed = false;
+                let cleaned = false;
+
+                function cleanup() {
+                    if (cleaned) return;
+                    cleaned = true;
+
+                    clearTimeout(timer);
+                    document.removeEventListener("visibilitychange", onHidden);
+
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+
+                    recording = null;
+                    paused = wasPaused;
+                    previous = performance.now();
+                    lastDraw = -Infinity;
+
+                    lockable.forEach(element => element.disabled = false);
+                    cancelButton.hidden = true;
+                    recordButton.textContent = "Record silent loop";
+
+                    syncControls();
+                    render();
+                }
+
+                function cancel(message) {
+                    cancelled = true;
+                    status.textContent = message;
+
+                    if (recorder && recorder.state !== "inactive") {
+                        recorder.stop();
+                    } else {
+                        cleanup();
+                    }
+                }
+
+                function onHidden() {
+                    if (document.hidden) {
+                        cancel("Recording cancelled. Keep this tab visible and try again.");
+                    }
+                }
+
+                try {
+                    phase = 0;
+                    render(phase, true);
+
+                    stream = canvas.captureStream(FPS);
+
+                    recorder = new MediaRecorder(stream, {
+                        mimeType,
+                        videoBitsPerSecond: 18000000
+                    });
+
+                    recorder.ondataavailable = event => {
+                        if (event.data.size) chunks.push(event.data);
+                    };
+
+                    recorder.onerror = () => {
+                        failed = true;
+                        status.textContent = "Recording failed. Please try again.";
+
+                        if (recorder.state !== "inactive") recorder.stop();
+                        cleanup();
+                    };
+
+                    recorder.onstop = () => {
+                        if (!cancelled && !failed && chunks.length) {
+                            const actualType = recorder.mimeType || mimeType;
+                            const extension = actualType.includes("mp4") ? "mp4" : "webm";
+
+                            download(
+                                new Blob(chunks, { type: actualType }),
+                                "kevs-art-lab-breathing-cathedral." + extension
+                            );
+
+                            status.textContent =
+                                `Saved silent ${extension.toUpperCase()}. Check playback before posting.`;
+
+                        } else if (!cancelled && !failed) {
+                            status.textContent = "The recording was empty. Please try again.";
+                        }
+
+                        cleanup();
+                    };
+
+                    lockable.forEach(element => element.disabled = true);
+
+                    cancelButton.hidden = false;
+                    cancelButton.onclick = () => cancel("Recording cancelled.");
+
+                    recordButton.textContent = `Recording ${settings.duration}s…`;
+                    status.textContent = "Recording full detail. Keep this tab visible.";
+
+                    document.addEventListener("visibilitychange", onHidden);
+
+                    paused = false;
+                    recorder.start();
+
+                    recording = {
+                        recorder,
+                        start: performance.now()
+                    };
+
+                    previous = recording.start;
+                    lastDraw = -Infinity;
+
+                    timer = setTimeout(() => {
+                        if (recorder.state === "recording") recorder.stop();
+                    }, settings.duration * 1000 + 100);
+
+                } catch (error) {
+                    failed = true;
+                    cleanup();
+
+                    status.textContent = "Could not record: " + error.message;
+                }
+            };
+
+            /* =========================================================
+               PLAYBACK
+               The canvas stays 1080 × 1920 at every preview size.
+               ========================================================= */
+
+            function animate(now) {
+                const delta = Math.max(0, (now - previous) / 1000);
+                previous = now;
+
+                if (recording) {
+                    const elapsed = (now - recording.start) / 1000;
+
+                    if (elapsed >= settings.duration) {
+                        if (recording.recorder.state === "recording") {
+                            recording.recorder.stop();
+                        }
+                    } else {
+                        phase = elapsed / settings.duration;
+
+                        if (now - lastDraw >= 1000 / FPS - 2) {
+                            render(phase, true);
+                            lastDraw = now;
+                        }
+                    }
+
+                } else if (!paused && !document.hidden) {
+                    phase = (phase + delta / settings.duration) % 1;
+
+                    if (now - lastDraw >= 1000 / FPS - 2) {
+                        render();
+                        lastDraw = now;
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            document.addEventListener("visibilitychange", () => {
+                previous = performance.now();
+                lastDraw = -Infinity;
+            });
+
+            buildColours();
+            buildDust();
+            syncControls();
+            render();
+
+            requestAnimationFrame(animate);
+        })();
+    </script>
+</body>
+
+</html>

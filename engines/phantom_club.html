@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phantom Club — Kev's Art Lab</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #080b10;
+      color: #eff5fa;
+      font-family: Arial, sans-serif;
+    }
+
+    main {
+      min-height: 100svh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 40px;
+      padding: 24px;
+    }
+
+    #art {
+      display: block;
+      width: min(48vw, calc(88svh * 9 / 16));
+      height: auto;
+      aspect-ratio: 9 / 16;
+      background: #000;
+      border: 1px solid #24313c;
+    }
+
+    aside {
+      width: 330px;
+      max-width: 100%;
+    }
+
+    .eyebrow {
+      color: #ffb000;
+      font-size: 10px;
+      letter-spacing: 3px;
+    }
+
+    h1 {
+      margin: 14px 0;
+      font: normal 44px Georgia, serif;
+      letter-spacing: -1px;
+    }
+
+    p {
+      color: #a6b5c2;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .control {
+      margin: 18px 0;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    output {
+      color: #8da6b9;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #00d9ff;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 36px;
+      background: #101720;
+      border: 1px solid #30404c;
+    }
+
+    .two,
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .check {
+      justify-content: flex-start;
+      align-items: center;
+      margin: 16px 0;
+    }
+
+    input[type="checkbox"] {
+      accent-color: #00d9ff;
+    }
+
+    button {
+      padding: 12px 10px;
+      border: 1px solid #30404c;
+      border-radius: 5px;
+      background: #101720;
+      color: #eff5fa;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #00d9ff;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid #ffb000;
+      outline-offset: 4px;
+    }
+
+    :disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    #record,
+    #cancel {
+      grid-column: 1 / -1;
+      border-color: #168097;
+      background: #0a2831;
+    }
+
+    #cancel {
+      border-color: #ffb000;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    #status {
+      min-height: 42px;
+      font-size: 11px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        flex-direction: column;
+        gap: 24px;
+        padding: 18px;
+      }
+
+      #art {
+        width: min(90vw, calc(78svh * 9 / 16));
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <canvas id="art" width="1080" height="1920" role="img"
+      aria-label="A luminous, transparent club rotating in black space">
+    </canvas>
+
+    <aside>
+      <div class="eyebrow">KEV'S ART LAB / PHANTOM DECK / 03</div>
+      <h1>Phantom Club</h1>
+
+      <p>
+        Turning towards you—or away?
+        Imagine the near edge becoming the far edge.
+        The actual rotation never changes direction.
+      </p>
+
+      <div class="control">
+        <label for="duration">
+          Seconds per turn <output id="durationValue"></output>
+        </label>
+        <input id="duration" type="range" min="8" max="24" step="1">
+      </div>
+
+      <div class="control">
+        <label for="depth">
+          Sculpture depth <output id="depthValue"></output>
+        </label>
+        <input id="depth" type="range" min="0.08" max="0.42" step="0.01">
+      </div>
+
+      <div class="control">
+        <label for="opening">
+          Centre opening <output id="openingValue"></output>
+        </label>
+        <input id="opening" type="range" min="0.35" max="0.75" step="0.01">
+      </div>
+
+      <div class="control">
+        <label for="tilt">
+          Axis tilt <output id="tiltValue"></output>
+        </label>
+        <input id="tilt" type="range" min="-20" max="20" step="1">
+      </div>
+
+      <div class="control">
+        <label for="glow">
+          Glow <output id="glowValue"></output>
+        </label>
+        <input id="glow" type="range" min="0" max="1" step="0.05">
+      </div>
+
+      <div class="two">
+        <div class="control">
+          <label for="colorA">Outer colour</label>
+          <input id="colorA" type="color">
+        </div>
+
+        <div class="control">
+          <label for="colorB">Inner colour</label>
+          <input id="colorB" type="color">
+        </div>
+      </div>
+
+      <label class="check">
+        <input id="white" type="checkbox">
+        White illusion mode
+      </label>
+
+      <label class="check">
+        <input id="marks" type="checkbox">
+        Card corner marks
+      </label>
+
+      <div class="buttons">
+        <button id="pause" type="button">Pause</button>
+        <button id="restart" type="button">Restart</button>
+        <button id="cover" type="button">Save cover PNG</button>
+        <button id="reset" type="button">Reset look</button>
+        <button id="record" type="button">Record silent loop</button>
+        <button id="cancel" type="button" hidden>Cancel recording</button>
+      </div>
+
+      <p id="status" role="status" aria-live="polite">
+        1080 × 1920 · Silent · No external libraries
+      </p>
+
+      <p>
+        Perceived reversal varies between viewers.
+        Recording targets 30 FPS; keep this tab visible.
+        Downloads use MP4 when supported, otherwise WebM.
+      </p>
+    </aside>
+  </main>
+
+  <script>
+    "use strict";
+
+    (() => {
+      // CUSTOMISE YOUR DEFAULT LOOK HERE.
+      const DEFAULTS = {
+        duration: 16,
+        depth: 0.25,
+        opening: 0.60,
+        tilt: -8,
+        glow: 0.60,
+        colorA: "#00d9ff",
+        colorB: "#ffb000",
+        white: false,
+        marks: true
+      };
+
+      const settings = { ...DEFAULTS };
+
+      const WIDTH = 1080;
+      const HEIGHT = 1920;
+      const SCALE = 470;
+      const TAU = Math.PI * 2;
+      const FPS = 30;
+
+      const canvas = document.getElementById("art");
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const status = document.getElementById("status");
+
+      if (!ctx) {
+        status.textContent = "Canvas 2D is unavailable in this browser.";
+        return;
+      }
+
+      const keys = Object.keys(DEFAULTS);
+      const controls = Object.fromEntries(
+        keys.map(key => [key, document.getElementById(key)])
+      );
+
+      const pauseButton = document.getElementById("pause");
+      const recordButton = document.getElementById("record");
+      const cancelButton = document.getElementById("cancel");
+
+      const lockable = [
+        ...document.querySelectorAll("input"),
+        ...document.querySelectorAll("button:not(#cancel)")
+      ];
+
+      let phase = 0;
+      let previous = performance.now();
+      let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let recording = null;
+      let particles = [];
+      let sprites = [];
+
+      // Cubic curves defining three rounded lobes and a flared stem.
+      const curves = [
+        [[0, -1], [.40, -1], [.63, -.55], [.30, -.24]],
+        [[.30, -.24], [.68, -.50], [1, -.16], [.88, .22]],
+        [[.88, .22], [.79, .62], [.32, .66], [.12, .35]],
+        [[.12, .35], [.10, .60], [.19, .79], [.32, .90]],
+        [[.32, .90], [.12, .90], [-.12, .90], [-.32, .90]],
+        [[-.32, .90], [-.19, .79], [-.10, .60], [-.12, .35]],
+        [[-.12, .35], [-.32, .66], [-.79, .62], [-.88, .22]],
+        [[-.88, .22], [-1, -.16], [-.68, -.50], [-.30, -.24]],
+        [[-.30, -.24], [-.63, -.55], [-.40, -1], [0, -1]]
+      ];
+
+      // Sample the silhouette, then measure its perimeter.
+      const boundary = [];
+      const lengths = [0];
+
+      for (const curve of curves) {
+        for (let i = 0; i < 100; i++) {
+          const t = i / 100;
+          const a = 1 - t;
+
+          boundary.push([0, 1].map(axis =>
+            a * a * a * curve[0][axis] +
+            3 * a * a * t * curve[1][axis] +
+            3 * a * t * t * curve[2][axis] +
+            t * t * t * curve[3][axis]
+          ));
+        }
+      }
+
+      boundary.push(boundary[0]);
+
+      for (let i = 1; i < boundary.length; i++) {
+        lengths.push(
+          lengths[i - 1] +
+          Math.hypot(
+            boundary[i][0] - boundary[i - 1][0],
+            boundary[i][1] - boundary[i - 1][1]
+          )
+        );
+      }
+
+      function outline(u) {
+        const target = u * lengths[lengths.length - 1];
+        let low = 0;
+        let high = lengths.length - 1;
+
+        while (high - low > 1) {
+          const middle = (low + high) >> 1;
+
+          if (lengths[middle] > target) high = middle;
+          else low = middle;
+        }
+
+        const t = (target - lengths[low]) /
+          (lengths[high] - lengths[low]);
+
+        return [
+          boundary[low][0] + (boundary[high][0] - boundary[low][0]) * t,
+          boundary[low][1] + (boundary[high][1] - boundary[low][1]) * t
+        ];
+      }
+
+      function randomGenerator(seed) {
+        return () => {
+          seed |= 0;
+          seed = (seed + 0x6D2B79F5) | 0;
+
+          let n = Math.imul(seed ^ seed >>> 15, 1 | seed);
+          n ^= n + Math.imul(n ^ n >>> 7, 61 | n);
+
+          return ((n ^ n >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      function buildGeometry() {
+        const random = randomGenerator(31024);
+        particles = [];
+
+        function add(u, v, side, edge) {
+          const [bx, by] = outline(u);
+          const radius = settings.opening + (1 - settings.opening) * v;
+
+          particles.push({
+            x: bx * radius,
+            y: (by + .05) * radius - .05,
+            z: side * settings.depth * Math.sin(Math.PI * v),
+            band: Math.min(7, Math.floor(v * 8)),
+            size: edge ? 2.2 : 1.2 + random() * 1.25,
+            alpha: edge ? .85 : .35 + random() * .45
+          });
+        }
+
+        // Fixed particles on a curved, hollow shell.
+        for (let i = 0; i < 5600; i++) {
+          add(random(), random(), i % 2 ? 1 : -1, false);
+        }
+
+        for (let i = 0; i < 700; i++) {
+          add(i / 700, 1, 1, true);
+
+          if (i % 2 === 0) {
+            add(i / 700, 0, 1, true);
+          }
+        }
+      }
+
+      function rgb(hex) {
+        return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+      }
+
+      function buildSprites() {
+        const outer = rgb(settings.white ? "#eaf6ff" : settings.colorA);
+        const inner = rgb(settings.white ? "#eaf6ff" : settings.colorB);
+
+        sprites = Array.from({ length: 8 }, (_, i) => {
+          const mix = Math.max(0, Math.min(1, (i / 7 - .12) / .55));
+          const colour = inner.map((n, axis) =>
+            Math.round(n + (outer[axis] - n) * mix)
+          );
+
+          const sprite = document.createElement("canvas");
+          sprite.width = sprite.height = 40;
+
+          const s = sprite.getContext("2d");
+          const gradient = s.createRadialGradient(20, 20, 0, 20, 20, 20);
+
+          gradient.addColorStop(0, `rgba(${colour},1)`);
+          gradient.addColorStop(.13, `rgba(${colour},.95)`);
+          gradient.addColorStop(.32, `rgba(${colour},${settings.glow * .28})`);
+          gradient.addColorStop(1, `rgba(${colour},0)`);
+
+          s.fillStyle = gradient;
+          s.fillRect(0, 0, 40, 40);
+
+          return sprite;
+        });
+      }
+
+      function drawClubMark(x, y, size) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(size, size);
+        ctx.beginPath();
+        ctx.moveTo(0, -1);
+
+        for (const curve of curves) {
+          ctx.bezierCurveTo(
+            ...curve[1],
+            ...curve[2],
+            ...curve[3]
+          );
+        }
+
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawMarks() {
+        ctx.save();
+
+        ctx.globalAlpha = .7;
+        ctx.fillStyle = settings.white ? "#eaf6ff" : settings.colorA;
+        ctx.font = "52px Georgia, serif";
+        ctx.textAlign = "center";
+
+        ctx.fillText("A", 126, 340);
+        drawClubMark(126, 380, 20);
+
+        ctx.translate(WIDTH, HEIGHT);
+        ctx.rotate(Math.PI);
+
+        ctx.fillText("A", 126, 340);
+        drawClubMark(126, 380, 20);
+
+        ctx.restore();
+      }
+
+      function render(turn = phase) {
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const wrapped = ((turn % 1) + 1) % 1;
+        const angle = wrapped * TAU + .22;
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+
+        const tilt = settings.tilt * Math.PI / 180;
+        const ct = Math.cos(tilt);
+        const st = Math.sin(tilt);
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        for (const p of particles) {
+          const x = p.x * c + p.z * s;
+          const y = p.y;
+
+          // Orthographic projection with both sides visible.
+          // No depth-dependent size, brightness, shadows or occlusion.
+          const px = WIDTH / 2 + (x * ct - y * st) * SCALE;
+          const py = HEIGHT / 2 + (x * st + y * ct) * SCALE;
+          const diameter = p.size * (4.4 + settings.glow * 2.5);
+
+          ctx.globalAlpha = p.alpha;
+
+          ctx.drawImage(
+            sprites[p.band],
+            px - diameter / 2,
+            py - diameter / 2,
+            diameter,
+            diameter
+          );
+        }
+
+        ctx.restore();
+
+        if (settings.marks) drawMarks();
+      }
+
+      function syncControls() {
+        for (const key of keys) {
+          const input = controls[key];
+
+          if (input.type === "checkbox") {
+            input.checked = settings[key];
+          } else {
+            input.value = settings[key];
+          }
+
+          const output = document.getElementById(key + "Value");
+
+          if (output) {
+            output.textContent =
+              key === "duration" ? settings[key] + " s" :
+                key === "tilt" ? settings[key] + "°" :
+                  settings[key].toFixed(2);
+          }
+        }
+
+        pauseButton.textContent = paused ? "Play" : "Pause";
+      }
+
+      for (const key of keys) {
+        controls[key].addEventListener("input", () => {
+          const input = controls[key];
+
+          settings[key] =
+            input.type === "checkbox" ? input.checked :
+              input.type === "range" ? Number(input.value) :
+                input.value;
+
+          if (["depth", "opening"].includes(key)) buildGeometry();
+          if (["colorA", "colorB", "glow", "white"].includes(key)) buildSprites();
+
+          syncControls();
+          render();
+        });
+      }
+
+      pauseButton.onclick = () => {
+        paused = !paused;
+        previous = performance.now();
+        syncControls();
+      };
+
+      document.getElementById("restart").onclick = () => {
+        phase = 0;
+        previous = performance.now();
+        render();
+      };
+
+      document.getElementById("reset").onclick = () => {
+        Object.assign(settings, DEFAULTS);
+        phase = 0;
+
+        buildGeometry();
+        buildSprites();
+        syncControls();
+        render();
+      };
+
+      function download(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+
+      document.getElementById("cover").onclick = () => {
+        const cover = document.createElement("canvas");
+        cover.width = WIDTH;
+        cover.height = HEIGHT;
+
+        render(0);
+        cover.getContext("2d").drawImage(canvas, 0, 0);
+        render();
+
+        cover.toBlob(blob => {
+          if (!blob) {
+            status.textContent = "Could not save the cover. Please try again.";
+            return;
+          }
+
+          download(blob, "kevs-art-lab-phantom-club-cover.png");
+          status.textContent = "Cover saved. Check the profile crop before posting.";
+        }, "image/png");
+      };
+
+      recordButton.onclick = () => {
+        if (recording) return;
+
+        if (!window.MediaRecorder || !canvas.captureStream) {
+          status.textContent = "Recording is unavailable. Try Chrome or Edge.";
+          return;
+        }
+
+        const mimeType = [
+          "video/mp4;codecs=avc1.42001E",
+          "video/mp4",
+          "video/webm;codecs=vp8",
+          "video/webm"
+        ].find(type => MediaRecorder.isTypeSupported(type));
+
+        if (!mimeType) {
+          status.textContent = "No supported recording format was found.";
+          return;
+        }
+
+        const wasPaused = paused;
+        const chunks = [];
+
+        let stream;
+        let recorder;
+        let timer;
+        let cancelled = false;
+        let failed = false;
+        let cleaned = false;
+
+        function cleanup() {
+          if (cleaned) return;
+          cleaned = true;
+
+          clearTimeout(timer);
+          document.removeEventListener("visibilitychange", onHidden);
+
+          if (stream) stream.getTracks().forEach(track => track.stop());
+
+          recording = null;
+          paused = wasPaused;
+          previous = performance.now();
+
+          lockable.forEach(element => element.disabled = false);
+          cancelButton.hidden = true;
+          recordButton.textContent = "Record silent loop";
+
+          syncControls();
+          render();
+        }
+
+        function cancel(message) {
+          cancelled = true;
+          status.textContent = message;
+
+          if (recorder && recorder.state !== "inactive") recorder.stop();
+          else cleanup();
+        }
+
+        function onHidden() {
+          if (document.hidden) {
+            cancel("Recording cancelled. Keep the tab visible and try again.");
+          }
+        }
+
+        try {
+          phase = 0;
+          render();
+
+          // Canvas-only stream: no microphone and no audio tracks.
+          stream = canvas.captureStream(FPS);
+
+          recorder = new MediaRecorder(stream, {
+            mimeType,
+            videoBitsPerSecond: 18000000
+          });
+
+          recorder.ondataavailable = event => {
+            if (event.data.size) chunks.push(event.data);
+          };
+
+          recorder.onerror = () => {
+            failed = true;
+            status.textContent = "Recording failed. Please try again.";
+
+            if (recorder.state !== "inactive") recorder.stop();
+            cleanup();
+          };
+
+          recorder.onstop = () => {
+            if (!cancelled && !failed && chunks.length) {
+              const actualType = recorder.mimeType || mimeType;
+              const extension = actualType.includes("mp4") ? "mp4" : "webm";
+
+              download(
+                new Blob(chunks, { type: actualType }),
+                "kevs-art-lab-phantom-club." + extension
+              );
+
+              status.textContent =
+                `Saved silent ${extension.toUpperCase()}. Check playback before posting.`;
+            } else if (!cancelled && !failed) {
+              status.textContent = "The recording was empty. Please try again.";
+            }
+
+            cleanup();
+          };
+
+          lockable.forEach(element => element.disabled = true);
+          cancelButton.hidden = false;
+          cancelButton.onclick = () => cancel("Recording cancelled.");
+
+          recordButton.textContent = `Recording ${settings.duration}s…`;
+          status.textContent = "Keep this tab visible until recording finishes.";
+
+          document.addEventListener("visibilitychange", onHidden);
+
+          paused = false;
+          recorder.start();
+
+          recording = {
+            recorder,
+            start: performance.now()
+          };
+
+          previous = recording.start;
+
+          timer = setTimeout(() => {
+            if (recorder.state === "recording") recorder.stop();
+          }, settings.duration * 1000 + 100);
+
+        } catch (error) {
+          failed = true;
+          cleanup();
+          status.textContent = "Could not record: " + error.message;
+        }
+      };
+
+      function animate(now) {
+        const delta = Math.max(0, (now - previous) / 1000);
+        previous = now;
+
+        if (recording) {
+          const elapsed = (now - recording.start) / 1000;
+
+          if (elapsed >= settings.duration) {
+            if (recording.recorder.state === "recording") {
+              recording.recorder.stop();
+            }
+          } else {
+            phase = elapsed / settings.duration;
+            render();
+          }
+
+        } else if (!paused && !document.hidden) {
+          phase = (phase + delta / settings.duration) % 1;
+          render();
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        previous = performance.now();
+      });
+
+      buildGeometry();
+      buildSprites();
+      syncControls();
+      render();
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+
+</html>

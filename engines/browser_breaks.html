@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Browser Breaks — Kev's Art Lab</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #090b10;
+            color: #eee;
+            font-family: Arial, sans-serif;
+            display: grid;
+            place-items: center;
+        }
+
+        main {
+            display: grid;
+            justify-items: center;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        canvas {
+            display: block;
+            height: min(84vh, 960px);
+            width: auto;
+            max-width: 94vw;
+            object-fit: contain;
+            aspect-ratio: 9 / 16;
+            border-radius: 10px;
+            box-shadow: 0 16px 70px #0009;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button {
+            padding: 11px 16px;
+            border: 1px solid #526071;
+            border-radius: 7px;
+            background: #161c26;
+            color: white;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #253044;
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: default;
+        }
+
+        #status {
+            margin: 0;
+            max-width: 540px;
+            min-height: 2.5em;
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #a9b2c1;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <canvas id="canvas" width="1080" height="1920" aria-label="An animated webpage breaks into tiles and rebuilds">
+        </canvas>
+
+        <div class="controls">
+            <button id="pause">Pause</button>
+            <button id="restart">Restart</button>
+            <button id="record">Record 12-second video</button>
+        </div>
+
+        <p id="status">
+            1080 × 1920 · Silent animation · Keep this tab visible while recording.
+        </p>
+    </main>
+
+    <script>
+        "use strict";
+
+        /* =========================================================
+           YOUR TEMPLATE SETTINGS
+           Change these values to create another version.
+           Fonts must be installed on your computer.
+           ========================================================= */
+
+        const CONFIG = {
+            brand: "KEV'S ART LAB",
+            address: "kevsartlab.local",
+            headline: ["MAKE SOMETHING", "IMPOSSIBLE."],
+            subtitle: "Creative code. Beautiful consequences.",
+            button: "DO NOT CLICK",
+            warning: "EXPERIMENT 001 / HANDLE WITH CURIOSITY",
+            panels: ["EXPERIMENTS", "VISUALS", "CODE"],
+
+            // Try: Arial, "Arial Black", Verdana, Georgia, "Courier New"
+            headingFont: "Arial Black",
+            bodyFont: "Arial",
+            monoFont: "Courier New",
+
+            colors: {
+                background: "#030812",
+                panel: "#081727",
+                accent: "#00D9FF",     // Electric blue
+                secondary: "#B6FF00",  // Acid green
+                text: "#F0FAFF",
+                muted: "#8CA8BC",
+                border: "#17445A"
+            },
+
+            duration: 12,
+            fps: 60,
+
+            // More tiles = smaller fragments.
+            columns: 6,
+            rows: 10,
+
+            // Motion controls.
+            explosion: 1.0,
+            rotation: 1.0,
+            glow: 0.7,
+
+            // Export quality. Browser recording speed depends on your computer.
+            videoBitrate: 18000000
+        };
+
+        /* =========================================================
+           ENGINE — normally no need to edit below this line
+           ========================================================= */
+
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d", { alpha: false });
+
+        canvas.width = 1080;
+        canvas.height = 1920;
+
+        if (!ctx) throw new Error("Canvas 2D is unavailable.");
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const C = CONFIG.colors;
+        const TAU = Math.PI * 2;
+
+        const pauseButton = document.getElementById("pause");
+        const restartButton = document.getElementById("restart");
+        const recordButton = document.getElementById("record");
+        const status = document.getElementById("status");
+
+        const page = document.createElement("canvas");
+        page.width = W;
+        page.height = H;
+        const p = page.getContext("2d");
+
+        const button = { x: 150, y: 830, w: 780, h: 140 };
+
+        const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+        const lerp = (a, b, t) => a + (b - a) * t;
+        const smooth = x => {
+            x = clamp(x);
+            return x * x * (3 - 2 * x);
+        };
+
+        function random(seed) {
+            const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+            return x - Math.floor(x);
+        }
+
+        function rounded(g, x, y, w, h, radius, fill, stroke) {
+            g.beginPath();
+            g.roundRect(x, y, w, h, radius);
+
+            if (fill) {
+                g.fillStyle = fill;
+                g.fill();
+            }
+
+            if (stroke) {
+                g.strokeStyle = stroke;
+                g.lineWidth = 2;
+                g.stroke();
+            }
+        }
+
+        function text(g, value, x, y, size, color, family, weight = 400) {
+            g.fillStyle = color;
+            g.font = `${weight} ${size}px "${family}", sans-serif`;
+            g.fillText(value, x, y);
+        }
+
+        function fitText(g, value, x, y, maxWidth, size, color, family, weight = 700) {
+            g.font = `${weight} ${size}px "${family}", sans-serif`;
+
+            while (g.measureText(value).width > maxWidth && size > 12) {
+                size--;
+                g.font = `${weight} ${size}px "${family}", sans-serif`;
+            }
+
+            g.fillStyle = color;
+            g.fillText(value, x, y);
+        }
+
+        function drawPage() {
+            p.fillStyle = C.background;
+            p.fillRect(0, 0, W, H);
+
+            // Subtle technical grid.
+            p.strokeStyle = C.border;
+            p.globalAlpha = 0.2;
+            p.lineWidth = 1;
+
+            for (let x = 0; x < W; x += 90) {
+                p.beginPath();
+                p.moveTo(x, 110);
+                p.lineTo(x, H);
+                p.stroke();
+            }
+
+            for (let y = 110; y < H; y += 90) {
+                p.beginPath();
+                p.moveTo(0, y);
+                p.lineTo(W, y);
+                p.stroke();
+            }
+
+            p.globalAlpha = 1;
+
+            // Fictional browser bar — part of the animation.
+            p.fillStyle = C.panel;
+            p.fillRect(0, 0, W, 110);
+
+            ["#ff6058", "#ffbd2e", "#28c840"].forEach((color, i) => {
+                p.fillStyle = color;
+                p.beginPath();
+                p.arc(40 + i * 35, 54, 10, 0, TAU);
+                p.fill();
+            });
+
+            rounded(p, 170, 25, 860, 58, 15, C.background, C.border);
+            text(p, CONFIG.address, 204, 63, 24, C.muted, CONFIG.monoFont);
+
+            fitText(p, CONFIG.brand, 70, 218, 880, 46,
+                C.text, CONFIG.headingFont);
+
+            p.fillStyle = C.accent;
+            p.fillRect(70, 260, 940, 5);
+
+            text(p, CONFIG.warning, 70, 336, 22, C.accent, CONFIG.monoFont);
+
+            fitText(p, CONFIG.headline[0], 70, 485, 940, 84,
+                C.text, CONFIG.headingFont);
+
+            fitText(p, CONFIG.headline[1], 70, 588, 940, 90,
+                C.accent, CONFIG.headingFont);
+
+            fitText(p, CONFIG.subtitle, 74, 673, 930, 30,
+                C.muted, CONFIG.bodyFont, 400);
+
+            // Main button.
+            p.save();
+            p.shadowColor = C.accent;
+            p.shadowBlur = 28 * CONFIG.glow;
+
+            rounded(p, button.x, button.y, button.w, button.h,
+                18, C.accent);
+
+            p.restore();
+
+            p.textAlign = "center";
+            fitText(p, CONFIG.button, W / 2, 918, button.w - 60, 54,
+                C.background, CONFIG.headingFont);
+            p.textAlign = "left";
+
+            text(p, "Everything is under control.", 290, 1025, 25,
+                C.muted, CONFIG.monoFont);
+
+            // Three large cards: these become recognisable debris.
+            CONFIG.panels.forEach((label, i) => {
+                const x = 70 + i * 320;
+                const y = 1170;
+
+                rounded(p, x, y, 300, 355, 16, C.panel, C.border);
+
+                text(p, `0${i + 1}`, x + 24, y + 47, 25,
+                    C.accent, CONFIG.monoFont);
+
+                p.save();
+                p.translate(x + 150, y + 165);
+                p.strokeStyle = i === 1 ? C.secondary : C.accent;
+                p.lineWidth = 5;
+
+                if (i === 0) {
+                    for (let j = 0; j < 3; j++) {
+                        p.save();
+                        p.rotate(j * 0.22);
+                        p.strokeRect(-60, -60, 120, 120);
+                        p.restore();
+                    }
+                } else if (i === 1) {
+                    for (let r = 28; r <= 76; r += 24) {
+                        p.beginPath();
+                        p.arc(0, 0, r, 0, TAU);
+                        p.stroke();
+                    }
+                } else {
+                    p.font = `bold 68px "${CONFIG.monoFont}"`;
+                    p.fillStyle = C.accent;
+                    p.textAlign = "center";
+                    p.fillText("</>", 0, 24);
+                }
+
+                p.restore();
+
+                fitText(p, label, x + 24, y + 290, 252, 28,
+                    C.text, CONFIG.headingFont);
+            });
+
+            p.fillStyle = C.border;
+            p.fillRect(70, 1640, 940, 2);
+
+            text(p, "ONE PAGE. MANY POSSIBILITIES.", 70, 1705, 26,
+                C.muted, CONFIG.monoFont);
+
+            text(p, "BUILT TO BREAK. DESIGNED TO RETURN.", 70, 1760, 22,
+                C.accent, CONFIG.monoFont);
+        }
+
+        const tileWidth = W / CONFIG.columns;
+        const tileHeight = H / CONFIG.rows;
+        const tiles = [];
+
+        for (let row = 0; row < CONFIG.rows; row++) {
+            for (let col = 0; col < CONFIG.columns; col++) {
+                const id = row * CONFIG.columns + col;
+                const sx = col * tileWidth;
+                const sy = row * tileHeight;
+                const x = sx + tileWidth / 2;
+                const y = sy + tileHeight / 2;
+
+                const dx = x - W / 2;
+                const dy = y - H / 2;
+                const angle = Math.atan2(dy, dx);
+
+                tiles.push({
+                    sx, sy, x, y,
+                    angle,
+                    radius: 550 + random(id + 1) * 900,
+                    depth: 180 + random(id + 5) * 950,
+                    spin: (random(id + 11) - 0.5) * 5,
+                    delay: random(id + 20) * 0.25,
+                    late: row === 7 && col === 4
+                });
+            }
+        }
+
+        function burstAmount(t, tile) {
+            const start = 2.2 + tile.delay;
+            const release = smooth((t - start) / 2.2);
+
+            const returnStart = tile.late ? 9.4 : 6.2 + tile.delay;
+            const returnEnd = tile.late ? 11.15 : 10.0;
+            const returnProgress = smooth(
+                (t - returnStart) / (returnEnd - returnStart)
+            );
+
+            return release * (1 - returnProgress);
+        }
+
+        function drawUnderworld(t, intensity) {
+            ctx.fillStyle = C.background;
+            ctx.fillRect(0, 0, W, H);
+
+            const glow = ctx.createRadialGradient(
+                W / 2, H / 2, 10,
+                W / 2, H / 2, 1050
+            );
+
+            glow.addColorStop(0, C.accent);
+            glow.addColorStop(1, C.background);
+
+            ctx.globalAlpha = 0.22 * CONFIG.glow;
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+
+            ctx.save();
+            ctx.translate(W / 2, H / 2);
+            ctx.rotate(t * 0.18);
+
+            for (let i = 0; i < 12; i++) {
+                const phase = (i / 12 + t * 0.09) % 1;
+                const size = 30 * Math.pow(45, phase);
+
+                ctx.globalAlpha = Math.sin(phase * Math.PI) * intensity * 0.6;
+                ctx.strokeStyle = i % 3 === 0 ? C.secondary : C.accent;
+                ctx.lineWidth = 2 + phase * 3;
+                ctx.strokeRect(-size, -size, size * 2, size * 2);
+            }
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawCursor(t) {
+            if (t > 2.45) return;
+
+            const progress = smooth((t - 0.25) / 1.55);
+            const x = lerp(950, 700, progress);
+            const y = lerp(1370, 917, progress);
+            const press = Math.sin(clamp((t - 1.9) / 0.35) * Math.PI);
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(1 - press * 0.12, 1 - press * 0.12);
+            ctx.shadowColor = "#000";
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = "#fff";
+            ctx.strokeStyle = "#121212";
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, 52);
+            ctx.lineTo(14, 39);
+            ctx.lineTo(25, 62);
+            ctx.lineTo(37, 56);
+            ctx.lineTo(25, 33);
+            ctx.lineTo(44, 32);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            if (t > 1.95) {
+                const u = clamp((t - 1.95) / 0.5);
+                ctx.save();
+                ctx.globalAlpha = 1 - u;
+                ctx.strokeStyle = C.secondary;
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.arc(700, 917, 15 + u * 90, 0, TAU);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function drawCracks(t) {
+            if (t < 2 || t > 2.85) return;
+
+            const growth = smooth((t - 2) / 0.4);
+            const fade = 1 - smooth((t - 2.45) / 0.4);
+
+            ctx.save();
+            ctx.globalAlpha = fade;
+            ctx.strokeStyle = C.secondary;
+            ctx.shadowColor = C.accent;
+            ctx.shadowBlur = 18;
+            ctx.lineWidth = 4;
+
+            for (let i = 0; i < 8; i++) {
+                const angle = i * TAU / 8;
+                ctx.beginPath();
+                ctx.moveTo(700, 917);
+
+                for (let j = 1; j <= 5; j++) {
+                    const distance = j * 180 * growth;
+                    const bend = (random(i * 9 + j) - 0.5) * 100 * growth;
+
+                    ctx.lineTo(
+                        700 + Math.cos(angle) * distance + Math.sin(angle) * bend,
+                        917 + Math.sin(angle) * distance - Math.cos(angle) * bend
+                    );
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function render(seconds) {
+            const t = ((seconds % CONFIG.duration) + CONFIG.duration)
+                % CONFIG.duration;
+
+            const intensity = smooth((t - 2) / 2) *
+                (1 - smooth((t - 8) / 3));
+
+            drawUnderworld(t, intensity);
+
+            const poses = tiles.map(tile => {
+                const amount = burstAmount(t, tile) * CONFIG.explosion;
+                const swirl = amount * 1.7;
+                const angle = tile.angle + swirl;
+                const z = amount * tile.depth;
+
+                const scale = 1200 / (1200 - Math.min(z, 1020));
+
+                return {
+                    tile,
+                    amount,
+                    z,
+                    scale,
+                    x: tile.x + Math.cos(angle) * tile.radius * amount,
+                    y: tile.y + Math.sin(angle) * tile.radius * amount,
+                    rotation: tile.spin * amount * CONFIG.rotation
+                };
+            });
+
+            // Distant fragments first; foreground fragments last.
+            poses.sort((a, b) => a.z - b.z);
+
+            const shake = t > 2 && t < 2.55
+                ? Math.sin((t - 2) * Math.PI / 0.55) * 12
+                : 0;
+
+            ctx.save();
+            ctx.translate(
+                Math.sin(t * 93) * shake,
+                Math.cos(t * 79) * shake
+            );
+
+            poses.forEach(pose => {
+                const { tile, amount, scale } = pose;
+
+                ctx.save();
+
+                ctx.translate(
+                    W / 2 + (pose.x - W / 2) * scale,
+                    H / 2 + (pose.y - H / 2) * scale
+                );
+
+                ctx.rotate(pose.rotation);
+
+                // A little foreshortening gives fragments a tumbling appearance.
+                const tilt = 1 - 0.45 * Math.abs(Math.sin(amount * tile.spin));
+                ctx.scale(scale * tilt, scale);
+
+                if (amount > 0.01) {
+                    ctx.shadowColor = C.accent;
+                    ctx.shadowBlur = 14 * CONFIG.glow;
+
+                    // Small coloured edge beneath each textured fragment.
+                    ctx.fillStyle = C.accent;
+                    ctx.fillRect(
+                        -tileWidth / 2 + 5,
+                        -tileHeight / 2 + 8,
+                        tileWidth,
+                        tileHeight
+                    );
+
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.drawImage(
+                    page,
+                    tile.sx, tile.sy, tileWidth, tileHeight,
+                    -tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight
+                );
+
+                if (amount > 0.02) {
+                    ctx.strokeStyle = C.accent;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(
+                        -tileWidth / 2,
+                        -tileHeight / 2,
+                        tileWidth,
+                        tileHeight
+                    );
+                }
+
+                ctx.restore();
+            });
+
+            ctx.restore();
+
+            drawCracks(t);
+            drawCursor(t);
+        }
+
+        /* Playback */
+        let origin = performance.now();
+        let pausedTime = 0;
+        let paused = false;
+        let recording = false;
+        let recorder = null;
+        let captureStream = null;
+        let stopTimer = null;
+
+        function currentTime() {
+            return paused ? pausedTime : (performance.now() - origin) / 1000;
+        }
+
+        function animate() {
+            render(currentTime());
+            requestAnimationFrame(animate);
+        }
+
+        pauseButton.addEventListener("click", () => {
+            if (recording) return;
+
+            if (paused) {
+                origin = performance.now() - pausedTime * 1000;
+            } else {
+                pausedTime = currentTime();
+            }
+
+            paused = !paused;
+            pauseButton.textContent = paused ? "Play" : "Pause";
+        });
+
+        restartButton.addEventListener("click", () => {
+            if (recording) return;
+            origin = performance.now();
+            pausedTime = 0;
+            render(0);
+        });
+
+        function restoreControls() {
+            recording = false;
+            pauseButton.disabled = false;
+            restartButton.disabled = false;
+            recordButton.disabled = false;
+            recordButton.textContent =
+                `Record ${CONFIG.duration}-second video`;
+
+            if (captureStream) {
+                captureStream.getTracks().forEach(track => track.stop());
+                captureStream = null;
+            }
+
+            clearTimeout(stopTimer);
+        }
+
+        /* Silent video export */
+        recordButton.addEventListener("click", () => {
+            if (recording) return;
+
+            if (!canvas.captureStream || !window.MediaRecorder) {
+                status.textContent =
+                    "Recording is unavailable here. Try a current Chrome or Edge browser.";
+                return;
+            }
+
+            const formats = [
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ];
+
+            const mimeType = formats.find(type =>
+                MediaRecorder.isTypeSupported(type)
+            );
+
+            if (!mimeType) {
+                status.textContent =
+                    "This browser cannot export WebM. Try Chrome or Edge.";
+                return;
+            }
+
+            try {
+                paused = false;
+                pausedTime = 0;
+                pauseButton.textContent = "Pause";
+                render(0);
+
+                captureStream = canvas.captureStream(CONFIG.fps);
+
+                recorder = new MediaRecorder(captureStream, {
+                    mimeType,
+                    videoBitsPerSecond: CONFIG.videoBitrate
+                });
+
+                const chunks = [];
+                let failed = false;
+
+                recorder.ondataavailable = event => {
+                    if (event.data.size) chunks.push(event.data);
+                };
+
+                recorder.onerror = () => {
+                    failed = true;
+                    status.textContent =
+                        "Recording failed. Try closing other busy tabs and recording again.";
+                    restoreControls();
+                };
+
+                recorder.onstop = () => {
+                    if (!failed && chunks.length) {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+
+                        link.href = url;
+                        link.download = "kevs-art-lab-browser-breaks.webm";
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+                        status.textContent =
+                            "Video downloaded. Silent WebM · 1080 × 1920.";
+                    }
+
+                    restoreControls();
+                };
+
+                recording = true;
+                pauseButton.disabled = true;
+                restartButton.disabled = true;
+                recordButton.disabled = true;
+                recordButton.textContent = "Recording…";
+
+                status.textContent =
+                    "Recording from the beginning. Keep this tab visible.";
+
+                origin = performance.now();
+                recorder.start();
+
+                stopTimer = setTimeout(() => {
+                    if (recorder && recorder.state === "recording") {
+                        recorder.stop();
+                    }
+                }, CONFIG.duration * 1000);
+
+            } catch (error) {
+                restoreControls();
+                status.textContent = `Could not record: ${error.message}`;
+            }
+        });
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && recording) {
+                status.textContent =
+                    "The tab was hidden. The recording may drop frames; record again with it visible.";
+            }
+        });
+
+        drawPage();
+        recordButton.textContent = `Record ${CONFIG.duration}-second video`;
+        requestAnimationFrame(animate);
+    </script>
+</body>
+
+</html>

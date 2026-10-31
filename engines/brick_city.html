@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Brick City 2 — Kev's Art Lab</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #13c959;
+            color: #eaf6ff;
+            font-family: monospace, 'Trebuchet MS';
+            display: grid;
+            place-items: center;
+        }
+
+        main {
+            display: grid;
+            justify-items: center;
+            gap: 12px;
+            padding: 14px;
+        }
+
+        canvas {
+            display: block;
+            width: auto;
+            height: min(84vh, 960px);
+            max-width: 94vw;
+            aspect-ratio: 9 / 16;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 20px 80px #0009;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button {
+            padding: 11px 16px;
+            background: #102235;
+            color: #eaf6ff;
+            border: 1px solid #31536a;
+            border-radius: 7px;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #c98de2;
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: default;
+        }
+
+        #status {
+            margin: 0;
+            max-width: 540px;
+            color: #09947a;
+            font-size: 12px;
+            text-align: center;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <canvas id="canvas" width="1080" height="1920"
+            aria-label="A colourful brick city collapses into a spiral and rebuilds">
+        </canvas>
+
+        <div class="controls">
+            <button id="pause">Pause</button>
+            <button id="restart">Restart</button>
+            <button id="record">Record silent loop</button>
+        </div>
+
+        <p id="status">
+            1080 × 1920 · 12-second animation · No audio
+        </p>
+    </main>
+
+    <script>
+        "use strict";
+
+        /* =========================================================
+           CHANGE YOUR TEMPLATE SETTINGS HERE
+           ========================================================= */
+
+        const CONFIG = {
+            brand: "KEV'S ART LAB",
+            duration: 12,
+
+            background: "#040812",
+            street: "#102036",
+            pavement: "#29445b",
+            accent: "#B6FF00",
+            windows: "#ECFFFF",
+
+            colors: [
+                "#00D9FF",
+                "#B6FF00",
+                "#FFD600",
+                "#FF7900",
+                "#245BFF",
+                "#00E8A0",
+                "#FFB000",
+                "#21A5FF",
+                "#DFFF36"
+            ],
+
+            heights: [3, 7, 3, 11, 15, 6, 9, 6, 5],
+
+            // Try 0.8 for a tighter swirl or 1.15 for a wider one.
+            swirlSize: 0.65,
+
+            spinStrength: 3.0,
+            cameraMovement: 4.5,
+
+            showWindows: true,
+            showStuds: true,
+            showCaptions: false,
+
+            font: "monospace",
+            fps: 60,
+            videoBitrate: 20000000
+        };
+
+        /* =========================================================
+           SETUP AND COLOUR HELPERS
+           ========================================================= */
+
+        const canvas = document.getElementById("canvas");
+        canvas.width = 1920;
+        canvas.height = 1080;
+
+        const ctx = canvas.getContext("2d", { alpha: false });
+        if (!ctx) throw new Error("Canvas 2D is unavailable.");
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const TAU = Math.PI * 2;
+
+        const pauseButton = document.getElementById("pause");
+        const restartButton = document.getElementById("restart");
+        const recordButton = document.getElementById("record");
+        const status = document.getElementById("status");
+
+        const clamp = (v, a = 0, b = 1) =>
+            Math.max(a, Math.min(b, v));
+
+        const mix = (a, b, t) => a + (b - a) * t;
+
+        function smooth(v) {
+            v = clamp(v);
+            return v * v * (3 - 2 * v);
+        }
+
+        function random(seed) {
+            const n = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+            return n - Math.floor(n);
+        }
+
+        // Always returns HEX, so repeated shading remains correct.
+        function shade(hex, amount) {
+            const value = parseInt(hex.replace("#", ""), 16);
+
+            const channel = shift => {
+                const original = (value >> shift) & 255;
+                const result = Math.round(clamp(original * amount, 0, 255));
+                return result.toString(16).padStart(2, "0");
+            };
+
+            return "#" + channel(16) + channel(8) + channel(0);
+        }
+
+        let cameraAngle = 49;
+        let cameraScale = 48;
+
+        function cameraPoint(v) {
+            const c = Math.cos(cameraAngle);
+            const s = Math.sin(cameraAngle);
+
+            return [
+                v[0] * c - v[1] * s,
+                v[0] * s + v[1] * c,
+                v[2]
+            ];
+        }
+
+        function project(v) {
+            const q = cameraPoint(v);
+
+            return [
+                W / 2 + (q[0] - q[1]) * cameraScale,
+                1130 + (q[0] + q[1]) * cameraScale * .5
+                - q[2] * cameraScale
+            ];
+        }
+
+        function depth(v) {
+            const q = cameraPoint(v);
+            return q[0] + q[1] + q[2];
+        }
+
+        function rotate(v, rx, rz) {
+            const cx = Math.cos(rx);
+            const sx = Math.sin(rx);
+            const cz = Math.cos(rz);
+            const sz = Math.sin(rz);
+
+            const y = v[1] * cx - v[2] * sx;
+            const z = v[1] * sx + v[2] * cx;
+
+            return [
+                v[0] * cz - y * sz,
+                v[0] * sz + y * cz,
+                z
+            ];
+        }
+
+        function polygon(points, fill, stroke, lineWidth = 1) {
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i][0], points[i][1]);
+            }
+
+            ctx.closePath();
+
+            if (fill) {
+                ctx.fillStyle = fill;
+                ctx.fill();
+            }
+
+            if (stroke) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+            }
+        }
+
+        function groundRect(x, y, w, h, z, color) {
+            polygon([
+                project([x, y, z]),
+                project([x + w, y, z]),
+                project([x + w, y + h, z]),
+                project([x, y + h, z])
+            ], color);
+        }
+
+        function caption(value, y, size, color) {
+            ctx.textAlign = "center";
+            ctx.fillStyle = color;
+            ctx.font = `900 ${size}px "${CONFIG.font}", sans-serif`;
+            ctx.fillText(value, W / 2, y);
+        }
+
+        /* =========================================================
+           CITY GEOMETRY
+           ========================================================= */
+
+        const HALF_WIDTH = .72;
+        const HALF_HEIGHT = .48;
+        const bricks = [];
+
+        let id = 0;
+
+        // Zigzag collapse order travelling through the city.
+        const order = [4, 8, 2, 5, 4, 3, 6, 7, 15];
+
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 3; col++) {
+                const building = row * 3 + col;
+                const levels = CONFIG.heights[building];
+                const rank = order.indexOf(building);
+
+                for (let layer = 0; layer < levels; layer++) {
+                    for (let bx = 0; bx < 2; bx++) {
+                        for (let by = 0; by < 2; by++) {
+                            const seed = id++;
+
+                            bricks.push({
+                                seed,
+                                building,
+                                rank,
+                                layer,
+
+                                x: (col - 1) * 4.35 + (bx - .5) * 1.50,
+                                y: (row - 1) * 4.35 + (by - .5) * 1.50,
+                                z: .18 + HALF_HEIGHT + layer * .55,
+
+                                color: shade(
+                                    CONFIG.colors[building],
+                                    layer % 3 === 0 ? .93 : 1
+                                ),
+
+                                angle: random(seed + 4) * TAU,
+                                radius: 2.1 + random(seed + 10) * 4.1,
+                                altitude: 1.6 + random(seed + 20) * 7.3,
+                                spin: (random(seed + 30) - .5) * 3.8,
+
+                                late:
+                                    building === 4 &&
+                                    layer === levels - 1 &&
+                                    bx === 1 && by === 1
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        const B = HALF_WIDTH;
+        const Z = HALF_HEIGHT;
+
+        const cubeVertices = [
+            [-B, -B, -Z], [B, -B, -Z],
+            [B, B, -Z], [-B, B, -Z],
+            [-B, -B, Z], [B, -B, Z],
+            [B, B, Z], [-B, B, Z]
+        ];
+
+        const faces = [
+            { ids: [4, 5, 6, 7], normal: [0, 0, 1], light: 1.12, type: "top" },
+            { ids: [0, 3, 2, 1], normal: [0, 0, -1], light: .65 },
+            { ids: [1, 2, 6, 5], normal: [1, 0, 0], light: .94, type: "x" },
+            { ids: [0, 4, 7, 3], normal: [-1, 0, 0], light: .76 },
+            { ids: [3, 7, 6, 2], normal: [0, 1, 0], light: .78, type: "y" },
+            { ids: [0, 1, 5, 4], normal: [0, -1, 0], light: .86 }
+        ];
+
+        /* =========================================================
+           MOTION
+           ========================================================= */
+
+        function brickPose(brick, t) {
+            // Buildings release in sequence instead of all at once.
+            const releaseStart =
+                1.8 + brick.rank * .18 + brick.layer * .025;
+
+            const release = smooth((t - releaseStart) / 1.5);
+
+            // Lower layers return first.
+            const returnStart = brick.late
+                ? 9.7
+                : 6.7 + brick.rank * .07 + brick.layer * .12;
+
+            const returnDuration = brick.late ? 1.6 : 1.15;
+            const rebuild = smooth((t - returnStart) / returnDuration);
+
+            const amount = release * (1 - rebuild);
+
+            // Continuous orbit while the bricks are away from home.
+            const orbitTime = Math.max(0, t - releaseStart);
+            const orbitAngle =
+                brick.angle + orbitTime * 1.25 + brick.rank * .14;
+
+            const radius = brick.radius * CONFIG.swirlSize;
+
+            const swirlX = Math.cos(orbitAngle) * radius;
+            const swirlY = Math.sin(orbitAngle) * radius;
+            const swirlZ =
+                brick.altitude + Math.sin(orbitAngle * 1.5) * .45;
+
+            let x = mix(brick.x, swirlX, amount);
+            let y = mix(brick.y, swirlY, amount);
+            let z = mix(brick.z, swirlZ, amount);
+
+            // A brief building lean before its bricks release.
+            const lean = Math.sin(clamp((t - releaseStart) / .55) * Math.PI);
+            const leanStrength = lean * (1 - release) * .20;
+
+            x += brick.layer * leanStrength;
+            z -= leanStrength * .35;
+
+            // First warning: one roof brick shakes.
+            if (brick.building === 0 &&
+                brick.layer === CONFIG.heights[0] - 1 &&
+                t > .6 && t < 1.8) {
+                const warning = Math.sin((t - .6) / 1.2 * Math.PI);
+                x += Math.sin(t * 55) * .10 * warning;
+                z += Math.abs(Math.sin(t * 20)) * .14 * warning;
+            }
+
+            // Small landing bounce.
+            const landedAt = returnStart + returnDuration;
+
+            if (t > landedAt && t < landedAt + .25) {
+                const u = (t - landedAt) / .25;
+                z += Math.sin(u * Math.PI) * .12;
+            }
+
+            return {
+                x, y, z, amount,
+                rx: amount * Math.sin(orbitTime * 2 + brick.angle)
+                    * CONFIG.spinStrength,
+                rz: amount * (brick.spin + orbitTime * .65)
+                    * CONFIG.spinStrength
+            };
+        }
+
+        /* =========================================================
+           BACKGROUND
+           ========================================================= */
+
+        const background = document.createElement("canvas");
+        background.width = W;
+        background.height = H;
+
+        const bg = background.getContext("2d");
+        bg.fillStyle = CONFIG.background;
+        bg.fillRect(0, 0, W, H);
+
+        const glow = bg.createRadialGradient(540, 980, 60, 540, 980, 1000);
+        glow.addColorStop(0, "#153A55");
+        glow.addColorStop(1, CONFIG.background);
+
+        bg.fillStyle = glow;
+        bg.fillRect(0, 0, W, H);
+
+        for (let i = 0; i < 85; i++) {
+            bg.globalAlpha = .08 + random(i + 101) * .22;
+            bg.fillStyle = "#BEEDFF";
+            bg.fillRect(
+                random(i + 200) * W,
+                random(i + 400) * H,
+                2, 2
+            );
+        }
+        bg.globalAlpha = 1;
+
+        /* =========================================================
+           RENDERING
+           ========================================================= */
+
+        function render(seconds) {
+            const phase = ((seconds % CONFIG.duration) + CONFIG.duration)
+                % CONFIG.duration / CONFIG.duration;
+
+            const t = phase * 12;
+
+            // Gentle camera motion with matching start/end positions.
+            cameraAngle = Math.sin(phase * TAU) * .10
+                * CONFIG.cameraMovement;
+
+            // Pull back slightly during the destruction.
+            const pulledBack = smooth((t - 2) / 2)
+                * (1 - smooth((t - 8) / 2.8));
+
+            cameraScale = 42 - pulledBack * 10;
+
+            ctx.drawImage(background, 0, 0);
+
+            // Floating city base.
+            groundRect(-7.65, -7.65, 15.3, 15.3, -.28, "#020610");
+            groundRect(-7.5, -7.5, 15, 15, 0, CONFIG.street);
+
+            // Neighbourhood blocks.
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const x = (col - 1) * 4.35;
+                    const y = (row - 1) * 4.35;
+
+                    groundRect(x - 1.75, y - 1.75, 3.5, 3.5, .08,
+                        CONFIG.pavement);
+                }
+            }
+
+            // Street markings.
+            for (const lane of [-2.175, 2.175]) {
+                for (let j = -7; j < 7; j += 1.1) {
+                    groundRect(lane - .035, j, .07, .42, .015, "#C2D8E5");
+                    groundRect(j, lane - .035, .42, .07, .015, "#C2D8E5");
+                }
+            }
+
+            // A moving wave follows the destruction.
+            if (t > 1.8 && t < 4.7) {
+                const u = (t - 1.8) / 2.9;
+                const ring = [];
+
+                for (let k = 0; k < 64; k++) {
+                    const a = k / 64 * TAU;
+                    ring.push(project([
+                        -4.35 + Math.cos(a) * u * 17,
+                        -4.35 + Math.sin(a) * u * 17,
+                        .10
+                    ]));
+                }
+
+                ctx.globalAlpha = (1 - u) * .7;
+                polygon(ring, null, CONFIG.accent, 3);
+                ctx.globalAlpha = 1;
+            }
+
+            const drawList = [];
+
+            function queue(points, fill, stroke = "#102434", bias = 0) {
+                drawList.push({
+                    points: points.map(project),
+                    depth: points.reduce((sum, v) => sum + depth(v), 0)
+                        / points.length + bias,
+                    fill,
+                    stroke
+                });
+            }
+
+            for (const brick of bricks) {
+                const pose = brickPose(brick, t);
+
+                function world(v) {
+                    const r = rotate(v, pose.rx, pose.rz);
+                    return [r[0] + pose.x, r[1] + pose.y, r[2] + pose.z];
+                }
+
+                const transformed = cubeVertices.map(world);
+
+                for (const face of faces) {
+                    const normal = cameraPoint(
+                        rotate(face.normal, pose.rx, pose.rz)
+                    );
+
+                    if (normal[0] + normal[1] + normal[2] <= 0) continue;
+
+                    queue(
+                        face.ids.map(index => transformed[index]),
+                        shade(brick.color, face.light)
+                    );
+
+                    // Two inset windows on each visible front-facing wall.
+                    if (CONFIG.showWindows &&
+                        (face.type === "x" || face.type === "y")) {
+
+                        for (const offset of [-.35, .35]) {
+                            const halfWindow = .19;
+                            const lower = -.14;
+                            const upper = .14;
+                            const edge = B + .008;
+                            let window;
+
+                            if (face.type === "x") {
+                                window = [
+                                    [edge, offset - halfWindow, lower],
+                                    [edge, offset + halfWindow, lower],
+                                    [edge, offset + halfWindow, upper],
+                                    [edge, offset - halfWindow, upper]
+                                ];
+                            } else {
+                                window = [
+                                    [offset - halfWindow, edge, lower],
+                                    [offset + halfWindow, edge, lower],
+                                    [offset + halfWindow, edge, upper],
+                                    [offset - halfWindow, edge, upper]
+                                ];
+                            }
+
+                            const lit = random(brick.seed * 3 + offset + 9) > .16;
+
+                            queue(
+                                window.map(world),
+                                lit ? CONFIG.windows : "#133045",
+                                shade(brick.color, .48),
+                                .01
+                            );
+                        }
+                    }
+
+                    // Toy-brick stud on the top surface.
+                    if (CONFIG.showStuds && face.type === "top") {
+                        const stud = [];
+
+                        for (let k = 0; k < 12; k++) {
+                            const a = k / 12 * TAU;
+                            stud.push(world([
+                                Math.cos(a) * .30,
+                                Math.sin(a) * .30,
+                                Z + .07
+                            ]));
+                        }
+
+                        queue(
+                            stud,
+                            shade(brick.color, 1.18),
+                            shade(brick.color, .70),
+                            .012
+                        );
+                    }
+                }
+            }
+
+
+            drawList.sort((a, b) => a.depth - b.depth);
+
+            for (const face of drawList) {
+                polygon(face.points, face.fill, face.stroke, 1.1);
+            }
+        }
+
+        /* =========================================================
+           PLAYBACK
+           ========================================================= */
+
+        let origin = performance.now();
+        let heldTime = 0;
+        let paused = false;
+        let recording = false;
+
+        function currentTime() {
+            return paused ? heldTime : (performance.now() - origin) / 1000;
+        }
+
+        function animate() {
+            render(currentTime());
+            requestAnimationFrame(animate);
+        }
+
+        pauseButton.onclick = () => {
+            if (recording) return;
+
+            if (paused) {
+                origin = performance.now() - heldTime * 1000;
+            } else {
+                heldTime = currentTime();
+            }
+
+            paused = !paused;
+            pauseButton.textContent = paused ? "Play" : "Pause";
+        };
+
+        restartButton.onclick = () => {
+            if (recording) return;
+
+            origin = performance.now();
+            heldTime = 0;
+            render(0);
+        };
+
+        /* =========================================================
+           SILENT VIDEO EXPORT
+           ========================================================= */
+
+        recordButton.onclick = () => {
+            if (recording) return;
+
+            if (!window.MediaRecorder || !canvas.captureStream) {
+                status.textContent =
+                    "Recording is unavailable. Try current Chrome or Edge.";
+                return;
+            }
+
+            const mimeType = [
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ].find(type => MediaRecorder.isTypeSupported(type));
+
+            if (!mimeType) {
+                status.textContent = "This browser cannot export WebM.";
+                return;
+            }
+
+            let stream;
+            let recorder;
+            let timer;
+            let failed = false;
+            let hiddenDuringRecording = false;
+            const chunks = [];
+
+            function watchVisibility() {
+                if (document.hidden) hiddenDuringRecording = true;
+            }
+
+            function cleanup() {
+                clearTimeout(timer);
+
+                document.removeEventListener(
+                    "visibilitychange", watchVisibility
+                );
+
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
+                recording = false;
+                pauseButton.disabled = false;
+                restartButton.disabled = false;
+                recordButton.disabled = false;
+                recordButton.textContent = "Record silent loop";
+            }
+
+            try {
+                paused = false;
+                heldTime = 0;
+                pauseButton.textContent = "Pause";
+
+                render(0);
+                stream = canvas.captureStream(CONFIG.fps);
+
+                recorder = new MediaRecorder(stream, {
+                    mimeType,
+                    videoBitsPerSecond: CONFIG.videoBitrate
+                });
+
+                recorder.ondataavailable = event => {
+                    if (event.data.size) chunks.push(event.data);
+                };
+
+                recorder.onerror = () => {
+                    failed = true;
+                    status.textContent = "Recording failed. Please try again.";
+                    cleanup();
+                };
+
+                recorder.onstop = () => {
+                    if (!failed && chunks.length) {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+
+                        link.href = url;
+                        link.download = "kevs-art-lab-brick-city-v2.webm";
+
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+                        status.textContent = hiddenDuringRecording
+                            ? "Downloaded. Check for dropped frames: the tab was hidden."
+                            : "Downloaded: silent 1080 × 1920 WebM.";
+                    }
+
+                    cleanup();
+                };
+
+                recording = true;
+                pauseButton.disabled = true;
+                restartButton.disabled = true;
+                recordButton.disabled = true;
+                recordButton.textContent = "Recording…";
+
+                status.textContent =
+                    "Keep this tab visible until the download starts.";
+
+                document.addEventListener(
+                    "visibilitychange", watchVisibility
+                );
+
+                origin = performance.now();
+                recorder.start();
+
+                timer = setTimeout(() => {
+                    if (recorder.state === "recording") {
+                        recorder.stop();
+                    }
+                }, CONFIG.duration * 1000);
+
+            } catch (error) {
+                cleanup();
+                status.textContent = `Could not record: ${error.message}`;
+            }
+        };
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+
+</html>

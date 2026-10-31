@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sci-Fi Staircase Studio (Pure Visual Mode)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #e0e6ed;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            position: relative;
+        }
+
+        /* Framing Overlay */
+        .viewport-frame {
+            position: relative;
+            background: #000;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .viewport-frame.aspect-9-16 {
+            width: calc(100vh * (9/16));
+            height: 100vh;
+            max-width: 100vw;
+        }
+
+        .viewport-frame.aspect-1-1 {
+            width: 90vh;
+            height: 90vh;
+            max-width: 90vw;
+            max-height: 90vw;
+        }
+
+        .viewport-frame.aspect-16-9 {
+            width: 100vw;
+            height: calc(100vw * (9/16));
+            max-height: 100vh;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        /* UI Controls Panel */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            background: rgba(10, 14, 23, 0.85);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
+        #ui-panel.collapsed {
+            transform: translateX(-340px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #00f3ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 0;
+            background: none;
+            border: none;
+            color: #88a0b5;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            color: #00f3ff;
+            border-bottom-color: #00f3ff;
+            background: rgba(0, 243, 255, 0.05);
+        }
+
+        .panel-content {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-label span.val {
+            color: #00f3ff;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00f3ff;
+        }
+
+        select,
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e0e6ed;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        select:hover,
+        button:hover {
+            border-color: #00f3ff;
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        .btn-danger {
+            border-color: rgba(255, 50, 50, 0.3);
+            color: #ff5555;
+        }
+
+        .btn-danger:hover {
+            border-color: #ff3333;
+            background: rgba(255, 50, 50, 0.15);
+        }
+
+        .btn-record {
+            background: rgba(255, 50, 80, 0.2);
+            border-color: #ff3355;
+            color: #ff3355;
+            font-weight: bold;
+        }
+
+        .btn-record.recording {
+            background: #ff3355;
+            color: #fff;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 51, 85, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 51, 85, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 51, 85, 0);
+            }
+        }
+
+        /* Module List */
+        .module-list {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .module-item {
+            padding: 8px 10px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+        }
+
+        .module-item:hover,
+        .module-item.selected {
+            background: rgba(0, 243, 255, 0.15);
+            color: #00f3ff;
+        }
+
+        .toggle-ui-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 99;
+            background: rgba(10, 14, 23, 0.8);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            color: #00f3ff;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Three.js + PostProcessing CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+</head>
+
+<body>
+
+    <button class="toggle-ui-btn" id="toggle-ui" title="Toggle UI Controls (Hotkey: H)">⚙️</button>
+
+    <div id="ui-panel">
+        <div class="panel-header">
+            <div class="panel-title"><span>⚡</span> STAIRCASE STUDIO</div>
+        </div>
+
+        <div class="panel-tabs">
+            <button class="tab-btn active" data-tab="tab-modules">BUILD</button>
+            <button class="tab-btn" data-tab="tab-style">STYLE</button>
+            <button class="tab-btn" data-tab="tab-camera">CAMERA</button>
+            <button class="tab-btn" data-tab="tab-export">EXPORT</button>
+        </div>
+
+        <div class="panel-content">
+            <!-- MODULES TAB -->
+            <div class="tab-content active" id="tab-modules">
+                <div class="btn-grid">
+                    <button id="add-stair">+ Staircase</button>
+                    <button id="add-pyramid">+ Pyramid</button>
+                    <button id="add-platform">+ Platform</button>
+                    <button id="add-pillar">+ Pillar Frame</button>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">SCENE MODULES</div>
+                    <div class="module-list" id="module-list-container"></div>
+                </div>
+
+                <div id="selected-module-controls" style="display:none;" class="control-group">
+                    <div class="control-label">SELECTED ITEM PARAMS</div>
+
+                    <div class="control-label">Position X <span class="val" id="val-posX">0</span></div>
+                    <input type="range" id="param-posX" min="-20" max="20" step="0.5" value="0">
+
+                    <div class="control-label">Position Y <span class="val" id="val-posY">0</span></div>
+                    <input type="range" id="param-posY" min="-30" max="30" step="0.5" value="0">
+
+                    <div class="control-label">Position Z <span class="val" id="val-posZ">0</span></div>
+                    <input type="range" id="param-posZ" min="-20" max="20" step="0.5" value="0">
+
+                    <div class="control-label">Rotation Y <span class="val" id="val-rotY">0</span></div>
+                    <input type="range" id="param-rotY" min="0" max="360" step="15" value="0">
+
+                    <button id="btn-delete-module" class="btn-danger btn-full" style="margin-top:8px;">Delete
+                        Item</button>
+                </div>
+            </div>
+
+            <!-- STYLE TAB -->
+            <div class="tab-content" id="tab-style">
+                <div class="control-group">
+                    <div class="control-label">COLOR PALETTE PRESETS</div>
+                    <select id="preset-color">
+                        <option value="amber">Amber Vector (Reference Image)</option>
+                        <option value="cyan">Cyber Cyan</option>
+                        <option value="emerald">Emerald Matrix</option>
+                        <option value="platinum">Platinum Monolith</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">PRIMARY COLOR</div>
+                    <input type="color" id="picker-primary" value="#ff7700"
+                        style="width:100%; height:32px; background:none; border:none; cursor:pointer;">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">BLOOM INTENSITY <span class="val" id="val-bloom">1.5</span></div>
+                    <input type="range" id="param-bloom" min="0" max="3" step="0.1" value="1.5">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">DATA STREAM PULSES <span class="val" id="val-pulses">50</span></div>
+                    <input type="range" id="param-pulses" min="0" max="150" step="10" value="50">
+                </div>
+            </div>
+
+            <!-- CAMERA TAB -->
+            <div class="tab-content" id="tab-camera">
+                <div class="control-group">
+                    <div class="control-label">CAMERA MODE</div>
+                    <select id="select-cam-mode">
+                        <option value="orbit">Continuous Orbit</option>
+                        <option value="fly">Vertical Fly-Through</option>
+                        <option value="roll">Vertigo Roll</option>
+                        <option value="manual">Manual User Control</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">MOTION SPEED <span class="val" id="val-cam-speed">1.0</span></div>
+                    <input type="range" id="param-cam-speed" min="0" max="3" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <!-- EXPORT TAB -->
+            <div class="tab-content" id="tab-export">
+                <div class="control-group">
+                    <div class="control-label">CANVAS ASPECT RATIO</div>
+                    <select id="select-aspect">
+                        <option value="aspect-9-16">9:16 Vertical Reel</option>
+                        <option value="aspect-1-1">1:1 Square</option>
+                        <option value="aspect-16-9">16:9 Widescreen</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">HIGH-QUALITY VIDEO RECORDING</div>
+                    <button id="btn-record-video" class="btn-record btn-full">⏺ Record WebM Video</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="viewport" class="viewport-frame aspect-9-16"></div>
+    </div>
+
+    <script>
+        // --- Application State ---
+        const state = {
+            primaryColor: 0xff7700,
+            secondaryColor: 0x220000,
+            bloomStrength: 1.5,
+            pulseCount: 50,
+            camMode: 'orbit',
+            camSpeed: 1.0,
+            aspectRatio: 'aspect-9-16',
+            selectedModuleId: null,
+            modules: []
+        };
+
+        // --- Three.js Setup ---
+        const viewport = document.getElementById('viewport');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
+        camera.position.set(25, 15, 35);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        viewport.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Postprocessing: Bloom
+        const renderScene = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(viewport.clientWidth, viewport.clientHeight),
+            state.bloomStrength,
+            0.4,
+            0.85
+        );
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- Dynamic Light Streams ---
+        let particleSystem = null;
+        function initDataStreams() {
+            if (particleSystem) scene.remove(particleSystem);
+
+            const count = state.pulseCount;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 16;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 40;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 16;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({
+                color: state.primaryColor,
+                size: 0.35,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        // --- Modular Geometry Generators ---
+        let moduleIdCounter = 0;
+
+        function createWireframeMaterial(color) {
+            return new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 1.5,
+                transparent: true,
+                opacity: 0.85
+            });
+        }
+
+        function createSolidMaterial(color) {
+            return new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.15,
+                wireframe: false,
+                side: THREE.DoubleSide
+            });
+        }
+
+        function addStaircase(x = 0, y = 0, z = 0, rotY = 0) {
+            const group = new THREE.Group();
+            const steps = 10;
+            const width = 4;
+            const height = 6;
+            const depth = 6;
+
+            const stepHeight = height / steps;
+            const stepDepth = depth / steps;
+
+            for (let i = 0; i < steps; i++) {
+                const stepGeo = new THREE.BoxGeometry(width, stepHeight, stepDepth);
+                const edges = new THREE.EdgesGeometry(stepGeo);
+                const line = new THREE.LineSegments(edges, createWireframeMaterial(state.primaryColor));
+                const mesh = new THREE.Mesh(stepGeo, createSolidMaterial(state.secondaryColor));
+
+                const stepGroup = new THREE.Group();
+                stepGroup.add(line);
+                stepGroup.add(mesh);
+
+                stepGroup.position.set(0, i * stepHeight, i * stepDepth - depth / 2);
+                group.add(stepGroup);
+            }
+
+            group.position.set(x, y, z);
+            group.rotation.y = rotY;
+
+            const id = ++moduleIdCounter;
+            group.userData = { id, type: 'Staircase', name: `Staircase #${id}` };
+            scene.add(group);
+            state.modules.push(group);
+            updateModuleListUI();
+            return group;
+        }
+
+        function addPyramid(x = 0, y = 0, z = 0) {
+            const group = new THREE.Group();
+            const geo = new THREE.ConeGeometry(3.5, 5, 4);
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, createWireframeMaterial(state.primaryColor));
+            const mesh = new THREE.Mesh(geo, createSolidMaterial(0x330000));
+
+            group.add(line);
+            group.add(mesh);
+            group.position.set(x, y, z);
+
+            const id = ++moduleIdCounter;
+            group.userData = { id, type: 'Pyramid', name: `Pyramid #${id}` };
+            scene.add(group);
+            state.modules.push(group);
+            updateModuleListUI();
+            return group;
+        }
+
+        function addPlatform(x = 0, y = 0, z = 0) {
+            const group = new THREE.Group();
+            const geo = new THREE.BoxGeometry(10, 0.4, 10);
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, createWireframeMaterial(state.primaryColor));
+            const mesh = new THREE.Mesh(geo, createSolidMaterial(state.secondaryColor));
+
+            group.add(line);
+            group.add(mesh);
+            group.position.set(x, y, z);
+
+            const id = ++moduleIdCounter;
+            group.userData = { id, type: 'Platform', name: `Platform #${id}` };
+            scene.add(group);
+            state.modules.push(group);
+            updateModuleListUI();
+            return group;
+        }
+
+        function addPillarFrame(x = 0, y = 0, z = 0) {
+            const group = new THREE.Group();
+            const height = 35;
+            const radius = 6;
+
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2 + Math.PI / 4;
+                const px = Math.cos(angle) * radius;
+                const pz = Math.sin(angle) * radius;
+
+                const pGeo = new THREE.CylinderGeometry(0.15, 0.15, height, 8);
+                const pEdges = new THREE.EdgesGeometry(pGeo);
+                const pLine = new THREE.LineSegments(pEdges, createWireframeMaterial(state.primaryColor));
+                pLine.position.set(px, 0, pz);
+                group.add(pLine);
+            }
+
+            group.position.set(x, y, z);
+
+            const id = ++moduleIdCounter;
+            group.userData = { id, type: 'Pillar Frame', name: `Pillars #${id}` };
+            scene.add(group);
+            state.modules.push(group);
+            updateModuleListUI();
+            return group;
+        }
+
+        // --- Build Default Scene Structure ---
+        function buildDefaultScene() {
+            // Clear existing modules
+            state.modules.forEach(m => scene.remove(m));
+            state.modules = [];
+            moduleIdCounter = 0;
+
+            addPillarFrame(0, 0, 0);
+
+            // Vertical Tiered Staircases
+            addStaircase(-2, 8, -2, 0);
+            addStaircase(2, 2, 2, Math.PI / 2);
+            addStaircase(-2, -4, -2, Math.PI);
+            addStaircase(2, -10, 2, -Math.PI / 2);
+
+            // Platforms & Center Core
+            addPlatform(0, 5, 0);
+            addPlatform(0, -5, 0);
+            addPyramid(0, 0, 0);
+
+            initDataStreams();
+        }
+
+        // --- UI Integration & Event Handlers ---
+        const uiPanel = document.getElementById('ui-panel');
+        document.getElementById('toggle-ui').addEventListener('click', () => {
+            uiPanel.classList.toggle('collapsed');
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'h' || e.key === 'H') uiPanel.classList.toggle('collapsed');
+        });
+
+        // Tab Switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Module Buttons
+        document.getElementById('add-stair').addEventListener('click', () => addStaircase(0, 0, 0));
+        document.getElementById('add-pyramid').addEventListener('click', () => addPyramid(0, 0, 0));
+        document.getElementById('add-platform').addEventListener('click', () => addPlatform(0, 0, 0));
+        document.getElementById('add-pillar').addEventListener('click', () => addPillarFrame(0, 0, 0));
+
+        // Module Management
+        function updateModuleListUI() {
+            const container = document.getElementById('module-list-container');
+            container.innerHTML = '';
+
+            state.modules.forEach(mod => {
+                const item = document.createElement('div');
+                item.className = `module-item ${state.selectedModuleId === mod.userData.id ? 'selected' : ''}`;
+                item.innerText = mod.userData.name;
+                item.onclick = () => selectModule(mod.userData.id);
+                container.appendChild(item);
+            });
+        }
+
+        function selectModule(id) {
+            state.selectedModuleId = id;
+            updateModuleListUI();
+
+            const mod = state.modules.find(m => m.userData.id === id);
+            const paramsContainer = document.getElementById('selected-module-controls');
+
+            if (mod) {
+                paramsContainer.style.display = 'flex';
+                document.getElementById('param-posX').value = mod.position.x;
+                document.getElementById('param-posY').value = mod.position.y;
+                document.getElementById('param-posZ').value = mod.position.z;
+                document.getElementById('param-rotY').value = THREE.MathUtils.radToDeg(mod.rotation.y);
+
+                document.getElementById('val-posX').innerText = mod.position.x;
+                document.getElementById('val-posY').innerText = mod.position.y;
+                document.getElementById('val-posZ').innerText = mod.position.z;
+                document.getElementById('val-rotY').innerText = Math.round(THREE.MathUtils.radToDeg(mod.rotation.y));
+            } else {
+                paramsContainer.style.display = 'none';
+            }
+        }
+
+        // Parameter Slider Handlers
+        ['posX', 'posY', 'posZ', 'rotY'].forEach(param => {
+            const input = document.getElementById(`param-${param}`);
+            input.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                document.getElementById(`val-${param}`).innerText = val;
+
+                const mod = state.modules.find(m => m.userData.id === state.selectedModuleId);
+                if (mod) {
+                    if (param === 'posX') mod.position.x = val;
+                    if (param === 'posY') mod.position.y = val;
+                    if (param === 'posZ') mod.position.z = val;
+                    if (param === 'rotY') mod.rotation.y = THREE.MathUtils.degToRad(val);
+                }
+            });
+        });
+
+        document.getElementById('btn-delete-module').addEventListener('click', () => {
+            const index = state.modules.findIndex(m => m.userData.id === state.selectedModuleId);
+            if (index !== -1) {
+                scene.remove(state.modules[index]);
+                state.modules.splice(index, 1);
+                state.selectedModuleId = null;
+                selectModule(null);
+                updateModuleListUI();
+            }
+        });
+
+        // Style Adjustments
+        document.getElementById('param-bloom').addEventListener('input', (e) => {
+            state.bloomStrength = parseFloat(e.target.value);
+            bloomPass.strength = state.bloomStrength;
+            document.getElementById('val-bloom').innerText = state.bloomStrength;
+        });
+
+        document.getElementById('param-pulses').addEventListener('input', (e) => {
+            state.pulseCount = parseInt(e.target.value);
+            document.getElementById('val-pulses').innerText = state.pulseCount;
+            initDataStreams();
+        });
+
+        // Preset Color Themes
+        const themes = {
+            amber: { primary: 0xff7700, secondary: 0x220000 },
+            cyan: { primary: 0x00f3ff, secondary: 0x002233 },
+            emerald: { primary: 0x00ff66, secondary: 0x002211 },
+            platinum: { primary: 0xffffff, secondary: 0x222222 }
+        };
+
+        function applyTheme(themeKey) {
+            const t = themes[themeKey];
+            state.primaryColor = t.primary;
+            state.secondaryColor = t.secondary;
+            document.getElementById('picker-primary').value = '#' + new THREE.Color(t.primary).getHexString();
+
+            // Update Scene Materials
+            state.modules.forEach(mod => {
+                mod.traverse(child => {
+                    if (child.isLineSegments) child.material.color.setHex(state.primaryColor);
+                    if (child.isMesh) child.material.color.setHex(state.secondaryColor);
+                });
+            });
+
+            if (particleSystem) particleSystem.material.color.setHex(state.primaryColor);
+        }
+
+        document.getElementById('preset-color').addEventListener('change', (e) => applyTheme(e.target.value));
+        document.getElementById('picker-primary').addEventListener('input', (e) => {
+            state.primaryColor = parseInt(e.target.value.replace('#', '0x'));
+            applyTheme('custom');
+        });
+
+        // Camera Mode Handlers
+        document.getElementById('select-cam-mode').addEventListener('change', (e) => state.camMode = e.target.value);
+        document.getElementById('param-cam-speed').addEventListener('input', (e) => {
+            state.camSpeed = parseFloat(e.target.value);
+            document.getElementById('val-cam-speed').innerText = state.camSpeed;
+        });
+
+        // Canvas Aspect Switcher
+        document.getElementById('select-aspect').addEventListener('change', (e) => {
+            viewport.className = `viewport-frame ${e.target.value}`;
+            resizeCanvas();
+        });
+
+        function resizeCanvas() {
+            const w = viewport.clientWidth;
+            const h = viewport.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            composer.setSize(w, h);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- WebM Video Recording Engine ---
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        const recordBtn = document.getElementById('btn-record-video');
+
+        recordBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            } else {
+                startRecording();
+            }
+        });
+
+        function startRecording() {
+            recordedChunks = [];
+            const stream = renderer.domElement.captureStream(60); // 60 FPS
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `sci-fi-staircase-${Date.now()}.webm`;
+                a.click();
+                recordBtn.classList.remove('recording');
+                recordBtn.innerText = '⏺ Record WebM Video';
+            };
+
+            mediaRecorder.start();
+            recordBtn.classList.add('recording');
+            recordBtn.innerText = '⏹ Stop & Export Video';
+        }
+
+        // --- Main Animation Loop ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime() * state.camSpeed;
+
+            // Dynamic Particle Motion
+            if (particleSystem) {
+                const positions = particleSystem.geometry.attributes.position.array;
+                for (let i = 0; i < state.pulseCount; i++) {
+                    positions[i * 3 + 1] -= 0.15;
+                    if (positions[i * 3 + 1] < -20) positions[i * 3 + 1] = 20;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // Camera Animations
+            if (state.camMode === 'orbit') {
+                camera.position.x = Math.sin(time * 0.3) * 35;
+                camera.position.z = Math.cos(time * 0.3) * 35;
+                camera.position.y = Math.sin(time * 0.15) * 10 + 5;
+                camera.lookAt(0, 0, 0);
+            } else if (state.camMode === 'fly') {
+                camera.position.x = Math.sin(time * 0.2) * 12;
+                camera.position.z = Math.cos(time * 0.2) * 12;
+                camera.position.y = ((time * 4) % 40) - 20;
+                camera.lookAt(0, camera.position.y + 5, 0);
+            } else if (state.camMode === 'roll') {
+                camera.position.x = Math.sin(time * 0.2) * 28;
+                camera.position.z = Math.cos(time * 0.2) * 28;
+                camera.rotation.z = Math.sin(time * 0.5) * 0.4;
+                camera.lookAt(0, 0, 0);
+            } else {
+                controls.update();
+            }
+
+            composer.render();
+        }
+
+        // Initialize
+        buildDefaultScene();
+        resizeCanvas();
+        animate();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Infinite Cyber-Nexus · Kev's Art Lab</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#dbe6e8;font:14px system-ui,sans-serif}
+  #stage{position:fixed;inset:0;width:100vw;height:100dvh;display:grid;place-items:center;background:#000}
+  /* The full-screen stage contains a true 9:16 plate without stretching. */
+  #plate{position:relative;width:min(100vw,56.25dvh);height:min(100dvh,177.777778vw)}
+  canvas{display:block;width:100%;height:100%}
+  #guide{pointer-events:none;position:absolute;inset:0;display:none}
+  #guide.on{display:block}#guide:before{content:"";position:absolute;right:0;top:0;width:15%;height:100%;background:#ff550018;border-left:1px dashed #ff550077}
+  #guide:after{content:"UI SAFE ZONE";position:absolute;bottom:0;height:20%;width:100%;border-top:1px dashed #ff550077;background:#ff550018;color:#ddab93;padding:12px;font-size:10px;letter-spacing:2px}
+  #panel{position:fixed;top:16px;left:16px;z-index:3;width:min(300px,calc(100vw - 32px));padding:20px;border:1px solid #344047;background:#080d12ed;border-radius:10px;box-shadow:0 10px 50px #000}
+  #panel{max-height:calc(100dvh - 32px);overflow-y:auto}#panel[hidden]{display:none}h1{font-size:15px;letter-spacing:2px;margin:0 0 16px}label{display:block;margin:16px 0 7px}select,button{font:inherit;color:inherit;background:#111b24;border:1px solid #344047;border-radius:5px;padding:9px;width:100%}input[type=range]{width:100%;accent-color:#00f3ff}button{cursor:pointer;margin-top:12px}button:disabled{opacity:.4;cursor:wait}p{font-size:12px;line-height:1.5;color:#8d9fa8}#message{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:min(85vw,460px);text-align:center;color:#8ea2a9;font-size:12px;z-index:4;background:#000b}#message:empty{display:none}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<main id="stage"><div id="plate"><canvas id="art" aria-label="Ordered obsidian staircases encircle a breathing geometric core"></canvas><div id="guide" aria-hidden="true"></div></div></main>
+<section id="panel" aria-label="Scene controls">
+  <h1>INFINITE CYBER-NEXUS</h1>
+  <label for="profile">Colour profile</label><select id="profile"><option value="cyan">Electric cyan</option><option value="orange">Quantum orange</option><option value="lime">Ion lime</option></select>
+  <label for="accent">Custom accent</label><input id="accent" type="color" value="#00f3ff">
+  <label for="glow">Glow</label><input id="glow" type="range" min="0" max="0.8" step="0.02" value="0.34">
+  <label for="elevation">Camera height</label><input id="elevation" type="range" min="4" max="16" step="1" value="11">
+  <label for="startAngle">Starting angle</label><input id="startAngle" type="range" min="0" max="360" step="5" value="45">
+  <label for="speed">Speed <output id="speedLabel">1× · 10 seconds</output></label><input id="speed" type="range" min="0.25" max="2" step="0.25" value="1">
+  <label for="quality">Render quality</label><select id="quality"><option value="auto">Auto · mobile friendly</option><option value="hd">1080 × 1920</option><option value="low">540 × 960</option></select>
+  <button id="safe" aria-pressed="false">Show safe-zone guide</button><button id="pause">Pause</button><button id="restart">Restart loop</button><button id="cover">Save PNG</button>
+  <label for="exportFps">Video frame rate</label><select id="exportFps"><option value="30">30 FPS · recommended for this laptop</option><option value="60">60 FPS · more demanding</option></select>
+  <button id="record">Download silent reel · 1080 × 1920</button><button id="cancelRecord" hidden>Cancel recording</button>
+  <p id="exportStatus" role="status">MP4 where supported; otherwise WebM. Recording takes one loop in real time. Keep this tab visible. Controls and guides are excluded. Actual frame rate and file duration depend on browser performance.</p>
+  <button id="saveLook">Save look in this browser</button><button id="loadLook">Load saved look</button>
+  <button id="exportLook">Download settings JSON</button><button id="importLook">Import settings JSON</button><input id="presetFile" type="file" accept="application/json,.json" hidden>
+  <button id="template">Download HTML template with this look</button>
+  <p>H: controls · G: guide · Space: pause.<br>On touch screens, tap with two fingers for controls. The default loop is exactly 10 seconds; speed changes its duration. Silent. No random elements.</p>
+</section>
+<div id="message" role="status">Loading Cyber-Nexus…</div>
+<script id="template-settings" type="application/json">{}</script>
+<script type="module">
+// 1. INITIALISE — pinned modules, one file, no audio or external assets.
+const message=document.querySelector('#message');
+try {
+const THREE=await import('three');
+const [{EffectComposer},{RenderPass},{UnrealBloomPass},{OutputPass}]=await Promise.all([
+  import('three/addons/postprocessing/EffectComposer.js'),
+  import('three/addons/postprocessing/RenderPass.js'),
+  import('three/addons/postprocessing/UnrealBloomPass.js'),
+  import('three/addons/postprocessing/OutputPass.js')
+]);
+const CONFIG=Object.freeze({duration:10,aspect:9/16,steps:12,run:6,rise:3,bloomStrength:.34,bloomRadius:.8,bloomThreshold:1.05});
+const TAU=Math.PI*2,canvas=document.querySelector('#art');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:false,alpha:false,powerPreference:'high-performance',preserveDrawingBuffer:true});
+renderer.setPixelRatio(1);renderer.setClearColor(0x000000);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0);
+const camera=new THREE.OrthographicCamera();camera.near=.1;camera.far=150;
+const physical=new THREE.MeshPhysicalMaterial({color:0x131b20,metalness:.78,roughness:.24,clearcoat:1,clearcoatRoughness:.16});
+const edgeMaterial=new THREE.LineBasicMaterial({color:0x00f3ff,toneMapped:false});
+const routeMaterial=new THREE.LineBasicMaterial({color:0x00f3ff,toneMapped:false});
+const packetMaterial=new THREE.MeshBasicMaterial({color:0x00f3ff,toneMapped:false});
+const coreMaterial=new THREE.MeshPhysicalMaterial({color:0x08191b,metalness:.55,roughness:.16,clearcoat:1,emissive:0x00f3ff,emissiveIntensity:.15});
+
+// 2. ARCHITECTURE — tread surfaces snap to a quarter-unit construction grid.
+// A real Euclidean lattice suggests Escher through inversion and orthographic
+// projection. It does not claim a physically impossible Penrose staircase.
+const boxes=[],edgeVertices=[],paths=[];
+const unitBox=new THREE.BoxGeometry(1,1,1);
+const unitEdges=new THREE.EdgesGeometry(unitBox).getAttribute('position');
+const matrix=new THREE.Matrix4(),vector=new THREE.Vector3();
+const turnX=new THREE.Matrix4().makeRotationX(Math.PI/2);
+const identity=new THREE.Matrix4();
+function transform(p,m){return new THREE.Vector3(...p).applyMatrix4(m).toArray().map(n=>Math.round(n*1e8)/1e8);}
+function box(center,size,rotation=identity){
+  const local=new THREE.Matrix4().makeScale(...size);local.setPosition(...center);
+  const world=rotation.clone().multiply(local);boxes.push(world);
+  for(let i=0;i<unitEdges.count;i++){
+    vector.fromBufferAttribute(unitEdges,i).applyMatrix4(world);
+    edgeVertices.push(vector.x,vector.y,vector.z);
+  }
+}
+// A closed route climbs, turns at right-angle landings, then descends.
+// Each tread touches its neighbours; all pulse paths follow tread/riser edges.
+function flight(a,b,rotation){
+  const count=CONFIG.steps,dx=(b[0]-a[0])/count,dz=(b[2]-a[2])/count,dy=(b[1]-a[1])/count;
+  const alongX=Math.abs(dx)>.001,width=.75,thickness=.25;
+  const path=[];
+  for(let i=0;i<count;i++){
+    const top=a[1]+dy*(i+1),x=a[0]+dx*i,z=a[2]+dz*i;
+    box([x+dx/2,top-thickness/2,z+dz/2],alongX?[Math.abs(dx),thickness,width]:[width,thickness,Math.abs(dz)],rotation);
+    // Vertical riser joins both treads, including descending/inverted flights.
+    box([x,top-dy/2-thickness/2,z],alongX?[.08,Math.abs(dy)+thickness,width]:[width,Math.abs(dy)+thickness,.08],rotation);
+    const sideX=alongX?0:width/2,sideZ=alongX?width/2:0;
+    if(i===0)path.push(transform([x+sideX,a[1],z+sideZ],rotation));
+    path.push(transform([x+sideX,top,z+sideZ],rotation));
+    path.push(transform([x+dx+sideX,top,z+dz+sideZ],rotation));
+  }
+  return path;
+}
+function circuit(y,rotation){
+  const corners=[[-3,y-3,-3],[3,y,-3],[3,y+3,3],[-3,y,3]];
+  const route=[];
+  for(let i=0;i<4;i++){
+    const a=corners[i],b=corners[(i+1)%4];
+    box([a[0],a[1]-.125,a[2]],[.75,.25,.75],rotation);
+    const next=flight(a,b,rotation);
+    if(route.length){
+      // Axis-aligned connector across the landing, never a diagonal shortcut.
+      const end=route.at(-1),begin=next[0];
+      const localEnd=new THREE.Vector3(...end).applyMatrix4(rotation.clone().invert());
+      const localBegin=new THREE.Vector3(...begin).applyMatrix4(rotation.clone().invert());
+      route.push(transform([localBegin.x,localEnd.y,localEnd.z],rotation));
+    }
+    route.push(...next);
+  }
+  const end=route.at(-1),begin=route[0];
+  const localEnd=new THREE.Vector3(...end).applyMatrix4(rotation.clone().invert());
+  const localBegin=new THREE.Vector3(...begin).applyMatrix4(rotation.clone().invert());
+  route.push(transform([localBegin.x,localEnd.y,localEnd.z],rotation));route.push(begin);
+  paths.push(route);
+}
+circuit(-4.5,identity);circuit(4.5,identity);circuit(0,turnX);
+// Four load-bearing server spines and continuous bridges unite all decks.
+for(const x of [-3,3])for(const z of [-3,3])box([x,0,z],[.25,15,.25]);
+for(const y of [-4.5,0,4.5]){
+  box([0,y-.125,-3],[6,.25,.75]);box([0,y-.125,3],[6,.25,.75]);
+}
+for(const x of [-3,3])box([x,-.125,0],[.75,.25,6]);
+// Central hub connects to the middle architecture by four orthogonal bridges.
+for(const axis of [0,2])for(const sign of [-1,1]){
+  const p=[0,-.125,0],s=[.75,.25,.75];p[axis]=sign*2;s[axis]=2;
+  box(p,s);
+}
+const architecture=new THREE.InstancedMesh(unitBox,physical,boxes.length);
+boxes.forEach((m,i)=>architecture.setMatrixAt(i,m));architecture.instanceMatrix.needsUpdate=true;scene.add(architecture);
+const edges=new THREE.BufferGeometry();edges.setAttribute('position',new THREE.Float32BufferAttribute(edgeVertices,3));
+scene.add(new THREE.LineSegments(edges,edgeMaterial));
+// One singular massive, perfectly regular core. Its outer cage remains fixed
+// so breathing does not detach bridges from the hub.
+const coreGroup=new THREE.Group();scene.add(coreGroup);
+const octahedron=new THREE.OctahedronGeometry(1.65);
+coreGroup.add(new THREE.Mesh(octahedron,coreMaterial));
+coreGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(octahedron),routeMaterial));
+const cage=new THREE.OctahedronGeometry(1.85);
+scene.add(new THREE.LineSegments(new THREE.EdgesGeometry(cage),edgeMaterial));
+// Deterministic one-packet-per-circuit motion, with arc-length parametrisation.
+const packetGeometry=new THREE.BoxGeometry(.085,.085,.085);
+const packets=paths.map((points,index)=>{
+  const vertices=points.map(p=>new THREE.Vector3(...p)),cumulative=[0];
+  for(let i=1;i<vertices.length;i++)cumulative.push(cumulative.at(-1)+vertices[i].distanceTo(vertices[i-1]));
+  const mesh=new THREE.Mesh(packetGeometry,packetMaterial);scene.add(mesh);
+  return {vertices,cumulative,length:cumulative.at(-1),mesh,index};
+});
+function placePacket(packet,phase){
+  const distance=((phase*4+packet.index/3)%1)*packet.length;
+  let j=1;while(j<packet.cumulative.length-1&&packet.cumulative[j]<distance)j++;
+  const start=packet.cumulative[j-1],span=packet.cumulative[j]-start;
+  packet.mesh.position.lerpVectors(packet.vertices[j-1],packet.vertices[j],span>0?(distance-start)/span:0);
+}
+
+// 3. LIGHT / POST — black plus one chromatic accent, restrained HDR bloom.
+scene.add(new THREE.AmbientLight(0xffffff,.28));
+const key=new THREE.DirectionalLight(0x00f3ff,3);key.position.set(5,9,6);scene.add(key);
+const rim=new THREE.DirectionalLight(0x00f3ff,2);rim.position.set(-6,2,-5);scene.add(rim);
+const coreLight=new THREE.PointLight(0x00f3ff,25,18,2);scene.add(coreLight);
+// No shadow maps, transmission buffers or full-screen volumetric raymarch:
+// solid occlusion + restrained lighting keep the mobile GPU budget predictable.
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(540,960),CONFIG.bloomStrength,CONFIG.bloomRadius,CONFIG.bloomThreshold);
+composer.addPass(bloom);composer.addPass(new OutputPass());
+const profiles={cyan:'#00f3ff',orange:'#ff5500',lime:'#b6ff00'};
+function setProfile(name){
+  const hex=profiles[name]||profiles.cyan;document.querySelector('#accent').value=hex;setAccent(hex);
+}
+function setAccent(hex){
+  const c=new THREE.Color(hex);
+  edgeMaterial.color.copy(c).multiplyScalar(1.35);
+  routeMaterial.color.copy(c).multiplyScalar(2.5);
+  packetMaterial.color.copy(c).multiplyScalar(5);
+  coreMaterial.emissive.copy(c);key.color.copy(c);rim.color.copy(c);coreLight.color.copy(c);
+}
+setProfile('cyan');
+
+// 4. FRAMING — full-screen container, undistorted 9:16 artwork, safe margins.
+// Bounds allow every camera angle to fit inside left 85% and upper 80%.
+const height=28,width=height*CONFIG.aspect;
+camera.left=-width*.425;camera.right=width*.575;
+camera.top=height*.4;camera.bottom=-height*.6;camera.updateProjectionMatrix();
+let renderWidth=0,quality='auto';
+function resize(){
+  const rect=document.querySelector('#plate').getBoundingClientRect();
+  const target=quality==='hd'?1080:quality==='low'?540:Math.min(810,Math.max(360,Math.round(rect.width*Math.min(devicePixelRatio||1,1.5)/18)*18));
+  if(target===renderWidth)return;renderWidth=target;
+  renderer.setSize(target,target*16/9,false);composer.setSize(target,target*16/9);
+}
+window.addEventListener('resize',resize,{passive:true});resize();
+
+// 5. LOOP — phase alone controls all animated state; no accumulated rotations.
+let phase=0,speed=1,paused=matchMedia('(prefers-reduced-motion: reduce)').matches,last=performance.now();
+let cameraHeight=11,startingAngle=Math.PI/4,recording=null;
+let stopped=false,raf=0;
+function renderAt(turn){
+  const p=((turn%1)+1)%1,angle=TAU*p;
+  camera.position.set(23*Math.sin(angle+startingAngle),cameraHeight,23*Math.cos(angle+startingAngle));camera.lookAt(0,0,0);
+  coreGroup.scale.setScalar(1+.02*Math.sin(angle));
+  coreLight.intensity=25+3*Math.sin(angle);
+  for(const packet of packets)placePacket(packet,p);
+  composer.render();
+}
+function animate(now){
+  if(stopped)return;
+  if(recording){
+    const elapsed=now-recording.start;
+    phase=Math.min(elapsed/recording.duration,1);
+    exportStatus.textContent='Recording '+Math.min(100,Math.floor(phase*100))+'% — keep this tab visible.';
+    if(elapsed>=recording.duration)finishRecording(false);
+  } else if(!paused&&!document.hidden)phase=(phase+(now-last)*speed/(CONFIG.duration*1000))%1;
+  last=now;renderAt(phase);raf=requestAnimationFrame(animate);
+}
+document.addEventListener('visibilitychange',()=>{last=performance.now();if(document.hidden&&recording)finishRecording(true,'Recording cancelled because the tab was hidden. Keep it visible and try again.');});
+
+// 6. CONTROLS — never rendered into the artwork itself.
+const panel=document.querySelector('#panel'),guide=document.querySelector('#guide'),pauseButton=document.querySelector('#pause');
+function togglePanel(){panel.hidden=!panel.hidden;}
+function toggleGuide(){const on=guide.classList.toggle('on');document.querySelector('#safe').setAttribute('aria-pressed',on);document.querySelector('#safe').textContent=on?'Hide safe-zone guide':'Show safe-zone guide';}
+function togglePause(){paused=!paused;last=performance.now();pauseButton.textContent=paused?'Play':'Pause';}
+pauseButton.textContent=paused?'Play':'Pause';
+document.querySelector('#profile').onchange=e=>setProfile(e.target.value);
+document.querySelector('#accent').oninput=e=>setAccent(e.target.value);
+document.querySelector('#glow').oninput=e=>{bloom.strength=Number(e.target.value);};
+document.querySelector('#elevation').oninput=e=>{cameraHeight=Number(e.target.value);};
+document.querySelector('#startAngle').oninput=e=>{startingAngle=Number(e.target.value)*Math.PI/180;};
+document.querySelector('#speed').oninput=e=>{speed=Number(e.target.value);document.querySelector('#speedLabel').textContent=speed+'× · '+(10/speed).toFixed(2).replace(/\.00$/,'')+' seconds';};
+document.querySelector('#quality').onchange=e=>{quality=e.target.value;resize();};
+document.querySelector('#safe').onclick=toggleGuide;pauseButton.onclick=togglePause;
+document.querySelector('#restart').onclick=()=>{phase=0;last=performance.now();};
+window.addEventListener('keydown',e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.repeat)return;
+  if(e.key.toLowerCase()==='h')togglePanel();
+  if(e.key.toLowerCase()==='g')toggleGuide();
+  if(recording)return;
+  if(e.code==='Space'){e.preventDefault();togglePause();}
+});
+canvas.addEventListener('touchstart',e=>{if(e.touches.length===2){e.preventDefault();togglePanel();}},{passive:false});
+document.querySelector('#cover').onclick=()=>{
+  const oldQuality=quality;quality='hd';resize();renderAt(phase);
+  canvas.toBlob(blob=>{
+    if(!blob){message.textContent='PNG export failed. Please try again.';return;}
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='kevs-art-lab-cyber-nexus.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  },'image/png');
+  quality=oldQuality;resize();
+};
+// 7. REUSABLE LOOKS — portable validated settings; no executable preset code.
+const exportStatus=document.querySelector('#exportStatus');
+const storageKey='kevs-cyber-nexus-template-v1';
+const lookKeys=['profile','accent','glow','elevation','startAngle','speed','quality','exportFps'];
+function getLook(){return {version:1,...Object.fromEntries(lookKeys.map(id=>[id,document.getElementById(id).value]))};}
+function applyLook(look){
+  if(!look||typeof look!=='object'||Array.isArray(look))throw new Error('Invalid preset');
+  for(const id of lookKeys){
+    const el=document.getElementById(id),value=look[id];if(value===undefined)continue;
+    if(el.type==='range'){
+      const n=Number(value);if(!Number.isFinite(n))continue;
+      el.value=String(Math.max(Number(el.min),Math.min(Number(el.max),n)));
+    }else if(el.type==='color'){
+      if(typeof value!=='string'||!/^#[0-9a-f]{6}$/i.test(value))continue;el.value=value;
+    }else{
+      if(![...el.options].some(o=>o.value===String(value)))continue;el.value=String(value);
+    }
+    el.dispatchEvent(new Event(el.type==='range'||el.type==='color'?'input':'change'));
+  }
+}
+function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+document.querySelector('#saveLook').onclick=()=>{try{localStorage.setItem(storageKey,JSON.stringify(getLook()));exportStatus.textContent='Look saved in this browser.';}catch{exportStatus.textContent='Browser storage unavailable. Use Download settings JSON.';}};
+document.querySelector('#loadLook').onclick=()=>{try{const raw=localStorage.getItem(storageKey);if(!raw)throw Error();applyLook(JSON.parse(raw));exportStatus.textContent='Saved look loaded.';}catch{exportStatus.textContent='No usable saved look found.';}};
+document.querySelector('#exportLook').onclick=()=>downloadBlob(new Blob([JSON.stringify(getLook(),null,2)],{type:'application/json'}),'cyber-nexus-look.json');
+document.querySelector('#importLook').onclick=()=>document.querySelector('#presetFile').click();
+document.querySelector('#presetFile').onchange=async e=>{
+  try{const file=e.target.files[0];if(!file)return;if(file.size>20000)throw Error();applyLook(JSON.parse(await file.text()));exportStatus.textContent='Look imported.';}
+  catch{exportStatus.textContent='Could not load that settings file. Choose a Cyber-Nexus JSON preset.';}finally{e.target.value='';}
+};
+document.querySelector('#template').onclick=()=>{
+  const copy=document.documentElement.cloneNode(true);
+  copy.querySelector('#template-settings').textContent=JSON.stringify(getLook());
+  copy.querySelectorAll('button,input,select').forEach(el=>el.removeAttribute('disabled'));
+  copy.querySelector('#cancelRecord').hidden=true;copy.querySelector('#panel').hidden=false;
+  copy.querySelector('#guide').classList.remove('on');
+  downloadBlob(new Blob(['<!doctype html>\n'+copy.outerHTML],{type:'text/html'}),'cyber-nexus-template.html');
+  exportStatus.textContent='HTML template downloaded with this look as its default. Internet is needed for Three.js.';
+};
+// 8. SILENT VIDEO — canvas-only stream, full HD, one real-time loop.
+// MediaRecorder timestamps follow wall time; slow devices can drop frames.
+function finishRecording(cancel=false,reason='Recording cancelled.'){
+  if(!recording||recording.ending)return;
+  recording.ending=true;recording.cancel=cancel;recording.reason=reason;
+  clearTimeout(recording.timer);
+  if(recording.recorder.state!=='inactive')recording.recorder.stop();
+}
+document.querySelector('#cancelRecord').onclick=()=>finishRecording(true);
+document.querySelector('#record').onclick=()=>{
+  if(recording)return;
+  if(!window.MediaRecorder||!canvas.captureStream){exportStatus.textContent='Recording is unavailable in this browser. Try current Chrome or Edge.';return;}
+  const mime=['video/mp4;codecs=avc1.42001E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  if(!mime){exportStatus.textContent='No supported video encoder found.';return;}
+  const previousState={quality,phase,paused};let stream;
+  const locked=[...panel.querySelectorAll('input,select,button')].filter(el=>el.id!=='cancelRecord');
+  const cleanup=()=>{
+    if(recording)clearTimeout(recording.timer);
+    stream?.getTracks().forEach(t=>t.stop());recording=null;
+    quality=previousState.quality;phase=previousState.phase;paused=previousState.paused;last=performance.now();resize();
+    locked.forEach(el=>el.disabled=false);document.querySelector('#cancelRecord').hidden=true;
+  };
+  try{
+    quality='hd';resize();renderAt(0);
+    stream=canvas.captureStream(Number(document.querySelector('#exportFps').value));
+    const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16000000});
+    const chunks=[],duration=CONFIG.duration*1000/speed;
+    const state={recorder,start:performance.now(),duration,cancel:false,ending:false,timer:null};
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    recorder.onerror=()=>{state.cancel=true;state.reason='The browser encoder failed. Try 30 FPS or another browser.';finishRecording(true,state.reason);if(recorder.state==='inactive')cleanup();};
+    recorder.onstop=()=>{
+      if(!state.cancel&&chunks.length){
+        const actualType=recorder.mimeType||mime,extension=actualType.includes('mp4')?'mp4':'webm';
+        downloadBlob(new Blob(chunks,{type:actualType}),'cyber-nexus-'+(duration/1000).toFixed(2)+'s.'+extension);
+        exportStatus.textContent=extension==='mp4'?'Silent 1080 × 1920 MP4 downloaded.':'Silent 1080 × 1920 WebM downloaded. Convert it to MP4 before uploading to Instagram.';
+      }else exportStatus.textContent=state.cancel?state.reason:'No video frames were captured. Please try again.';
+      cleanup();
+    };
+    locked.forEach(el=>el.disabled=true);document.querySelector('#cancelRecord').hidden=false;
+    recording=state;phase=0;recorder.start();state.start=performance.now();
+    state.timer=setTimeout(()=>finishRecording(false),duration+100);
+    exportStatus.textContent='Recording — keep this tab visible.';
+  }catch(error){console.error(error);cleanup();exportStatus.textContent='Could not start recording. Try 30 FPS in Chrome or Edge.';}
+};
+try{applyLook(JSON.parse(document.querySelector('#template-settings').textContent));}catch{console.warn('Invalid embedded look; using defaults.');}
+canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(recording)finishRecording(true,'Recording cancelled: graphics context lost.');stopped=true;cancelAnimationFrame(raf);message.textContent='Graphics context lost. Reload this page to restart.';});
+window.addEventListener('pagehide',()=>{
+  if(recording)finishRecording(true,'Recording cancelled: page closed.');
+  stopped=true;cancelAnimationFrame(raf);composer.dispose();bloom.dispose();renderer.dispose();
+  const geometries=new Set(),materials=new Set();scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
+  geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+},{once:true});
+window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
+// Read-only scene facts and deterministic capture hook for automated validation.
+window.cyberNexus={renderAt,config:CONFIG,paths,boxCount:boxes.length};
+message.textContent='H: controls · G: safe zones';setTimeout(()=>{message.textContent='';},3500);
+raf=requestAnimationFrame(animate);
+} catch(error) {
+ console.error(error);message.textContent='Could not start Cyber-Nexus. Check your internet connection (Three.js loads from CDN), WebGL support, and the browser console.';
+}
+</script>
+</body>
+</html>

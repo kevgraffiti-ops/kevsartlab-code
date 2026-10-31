@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phantom Bloom — Kev's Art Lab</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #05070c;
+            color: #edf8ff;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            min-height: 100vh;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px;
+        }
+
+        canvas {
+            display: block;
+            width: auto;
+            height: min(90vh, 960px);
+            max-width: 94vw;
+            aspect-ratio: 9 / 16;
+            object-fit: contain;
+            background: #000;
+            border: 1px solid #182634;
+            border-radius: 12px;
+            box-shadow: 0 20px 80px #0009;
+        }
+
+        aside {
+            width: min(310px, 94vw);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 32px;
+            font-weight: 600;
+        }
+
+        p {
+            color: #9aafbf;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .control {
+            margin: 21px 0;
+        }
+
+        .control label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #5beaff;
+        }
+
+        .colors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 36px;
+            padding: 2px;
+            border: 1px solid #284054;
+            background: #101923;
+            border-radius: 6px;
+        }
+
+        .check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            margin: 18px 0;
+        }
+
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 22px;
+        }
+
+        button {
+            padding: 11px 15px;
+            border: 1px solid #31526a;
+            background: #10202e;
+            color: white;
+            border-radius: 7px;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        button:hover {
+            background: #1a3548;
+        }
+
+        button:disabled,
+        input:disabled {
+            opacity: .5;
+        }
+
+        #record {
+            width: 100%;
+            border-color: #51dfff;
+        }
+
+        #status {
+            min-height: 42px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <canvas id="canvas" width="1080" height="1920" aria-label="A luminous particle flower rotating in darkness">
+        </canvas>
+
+        <aside>
+            <h1>Phantom Bloom</h1>
+
+            <p>
+                Is the flower turning towards you?
+                Imagine the open centre facing away instead.
+                Its actual rotation never reverses.
+            </p>
+
+            <div class="control">
+                <label for="duration">
+                    Seconds per revolution
+                    <span id="durationValue"></span>
+                </label>
+                <input id="duration" type="range" min="8" max="24" step="1" value="16">
+            </div>
+
+            <div class="control">
+                <label for="petals">
+                    Petals
+                    <span id="petalsValue"></span>
+                </label>
+                <input id="petals" type="range" min="3" max="9" step="1" value="6">
+            </div>
+
+            <div class="control">
+                <label for="curl">
+                    Petal curl
+                    <span id="curlValue"></span>
+                </label>
+                <input id="curl" type="range" min="0.15" max="1.2" step="0.05" value="0.65">
+            </div>
+
+            <div class="control">
+                <label for="tilt">
+                    Axis tilt
+                    <span id="tiltValue"></span>
+                </label>
+                <input id="tilt" type="range" min="-40" max="40" step="1" value="-18">
+            </div>
+
+            <div class="control">
+                <label for="size">
+                    Size
+                    <span id="sizeValue"></span>
+                </label>
+                <input id="size" type="range" min="0.65" max="1.15" step="0.01" value="1">
+            </div>
+
+            <div class="control">
+                <label for="glow">
+                    Glow
+                    <span id="glowValue"></span>
+                </label>
+                <input id="glow" type="range" min="0" max="1" step="0.05" value="0.45">
+            </div>
+
+            <div class="colors">
+                <div class="control">
+                    <label for="colorA">Main colour</label>
+                    <input id="colorA" type="color" value="#00d9ff">
+                </div>
+
+                <div class="control">
+                    <label for="colorB">Accent colour</label>
+                    <input id="colorB" type="color" value="#b6ff00">
+                </div>
+            </div>
+
+            <label class="check">
+                <input id="white" type="checkbox">
+                White illusion mode
+            </label>
+
+            <div class="buttons">
+                <button id="pause">Pause</button>
+                <button id="restart">Restart</button>
+                <button id="reset">Reset</button>
+                <button id="record">Record silent loop</button>
+            </div>
+
+            <p id="status">
+                1080 × 1920 · Silent WebM · Target 30 FPS
+            </p>
+        </aside>
+    </main>
+
+    <script>
+        "use strict";
+
+        /* =========================================================
+           TEMPLATE SETTINGS
+           ========================================================= */
+
+        const DEFAULTS = {
+            duration: 16,
+            petals: 6,
+            curl: 0.65,
+            tilt: -18,
+            size: 1,
+            glow: 0.45,
+
+            colorA: "#00d9ff",
+            colorB: "#b6ff00",
+            white: false,
+
+            // Reduce this to 2500 if your laptop struggles.
+            particleCount: 4200,
+
+            fps: 30,
+            bitrate: 18000000
+        };
+
+        const settings = { ...DEFAULTS };
+
+        /* =========================================================
+           SETUP
+           ========================================================= */
+
+        const canvas = document.getElementById("canvas");
+
+        // Fixed export resolution. Never resized to match the window.
+        canvas.width = 1080;
+        canvas.height = 1920;
+
+        const ctx = canvas.getContext("2d", { alpha: false });
+
+        if (!ctx) {
+            throw new Error("Canvas 2D is unavailable.");
+        }
+
+        const W = canvas.width;
+        const H = canvas.height;
+        const TAU = Math.PI * 2;
+
+        const pauseButton = document.getElementById("pause");
+        const restartButton = document.getElementById("restart");
+        const resetButton = document.getElementById("reset");
+        const recordButton = document.getElementById("record");
+        const status = document.getElementById("status");
+        const inputs = [...document.querySelectorAll("input")];
+
+        let particles = [];
+        let edgePoints = [];
+        let sprites = [];
+
+        let turns = 0;
+        let paused = false;
+        let recording = false;
+        let previousTime = performance.now();
+
+        function random(seed) {
+            const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+            return value - Math.floor(value);
+        }
+
+        function rgb(hex) {
+            const value = parseInt(hex.slice(1), 16);
+
+            return [
+                (value >> 16) & 255,
+                (value >> 8) & 255,
+                value & 255
+            ];
+        }
+
+        function blend(a, b, amount) {
+            return a.map((v, i) => Math.round(v + (b[i] - v) * amount));
+        }
+
+        /* =========================================================
+           FLOWER SURFACE
+        
+           A hollow centre, six rounded lobes and curled petals.
+           Geometry stays fixed; only its orientation changes.
+           ========================================================= */
+
+        function surface(angle, u) {
+            const wave = 0.5 + 0.5 * Math.cos(settings.petals * angle);
+
+            // A lobed outer edge creates the petals.
+            const outerRadius = 0.77 + 0.31 * Math.pow(wave, 1.35);
+            const innerRadius = 0.19;
+
+            const radius =
+                innerRadius + (outerRadius - innerRadius) * u;
+
+            // A small twist introduces curling radial strands.
+            const twist = 0.30 * settings.curl * (1 - u);
+
+            const x = Math.cos(angle + twist) * radius;
+            const y = Math.sin(angle + twist) * radius;
+
+            // Bowl-shaped depth, plus a gentle fold in each petal.
+            const bowl = settings.curl * (0.48 * u * u - 0.18);
+            const fold =
+                settings.curl *
+                0.17 *
+                Math.sin(settings.petals * angle) *
+                Math.pow(u, 1.5);
+
+            return [x, y, bowl + fold];
+        }
+
+        function buildFlower() {
+            particles = [];
+            edgePoints = [];
+
+            for (let i = 0; i < settings.particleCount; i++) {
+                const angle = random(i + 10) * TAU;
+
+                // Bias sampling slightly towards the broader outer petals.
+                const u = Math.sqrt(random(i + 900));
+
+                const point = surface(angle, u);
+
+                particles.push({
+                    point,
+
+                    // Colour varies across the surface, never with depth.
+                    color: Math.min(7, Math.floor(
+                        (0.5 + 0.5 * Math.sin(angle * 3 + u * 7)) * 7.999
+                    )),
+
+                    // Constant size and brightness for each individual point.
+                    radius: 0.85 + random(i + 300) * 0.95,
+                    alpha: 0.42 + random(i + 600) * 0.48
+                });
+            }
+
+            // Sparse beads around the outer edge and central opening.
+            for (let i = 0; i < 300; i++) {
+                const angle = i / 300 * TAU;
+
+                edgePoints.push({
+                    point: surface(angle, 1),
+                    color: i % 8
+                });
+
+                if (i % 2 === 0) {
+                    edgePoints.push({
+                        point: surface(angle, 0),
+                        color: i % 8
+                    });
+                }
+            }
+        }
+
+        /* =========================================================
+           PRE-RENDERED PARTICLE GLOW
+        
+           Small cached sprites are cheaper than applying blur
+           separately to thousands of particles every frame.
+           ========================================================= */
+
+        function buildSprites() {
+            sprites = [];
+
+            const a = rgb(settings.colorA);
+            const b = rgb(settings.colorB);
+
+            for (let i = 0; i < 8; i++) {
+                const color = settings.white
+                    ? [235, 247, 255]
+                    : blend(a, b, i / 7);
+
+                const sprite = document.createElement("canvas");
+                sprite.width = 32;
+                sprite.height = 32;
+
+                const g = sprite.getContext("2d");
+                const [r, green, blue] = color;
+
+                const gradient = g.createRadialGradient(
+                    16, 16, 0,
+                    16, 16, 16
+                );
+
+                gradient.addColorStop(0,
+                    `rgba(${r},${green},${blue},1)`);
+
+                gradient.addColorStop(0.10,
+                    `rgba(${r},${green},${blue},0.95)`);
+
+                gradient.addColorStop(0.23,
+                    `rgba(${r},${green},${blue},${0.35 * settings.glow})`);
+
+                gradient.addColorStop(0.60,
+                    `rgba(${r},${green},${blue},${0.07 * settings.glow})`);
+
+                gradient.addColorStop(1,
+                    `rgba(${r},${green},${blue},0)`);
+
+                g.fillStyle = gradient;
+                g.fillRect(0, 0, 32, 32);
+
+                sprites.push(sprite);
+            }
+        }
+
+        /* =========================================================
+           ORTHOGRAPHIC PROJECTION
+        
+           Crucially:
+           - Far particles do not shrink.
+           - Far particles do not become darker.
+           - There are no opaque faces hiding the back.
+           - The rotation direction never changes.
+        
+           Removing these depth cues permits ambiguous interpretation.
+           ========================================================= */
+
+        function projectionFrame() {
+            const rotation = turns * TAU;
+            const tilt = settings.tilt * Math.PI / 180;
+
+            return {
+                c: Math.cos(rotation),
+                s: Math.sin(rotation),
+                ct: Math.cos(tilt),
+                st: Math.sin(tilt),
+                scale: 410 * settings.size
+            };
+        }
+
+        function project(point, frame) {
+            // Continuous rotation around the vertical axis.
+            const x = point[0] * frame.c + point[2] * frame.s;
+            const z = -point[0] * frame.s + point[2] * frame.c;
+            const y = point[1];
+
+            // Fixed tilt of the entire axis within the image.
+            const sx = x * frame.ct - y * frame.st;
+            const sy = x * frame.st + y * frame.ct;
+
+            // z is intentionally not used for brightness, size or occlusion.
+            return [
+                W / 2 + sx * frame.scale,
+                H / 2 + sy * frame.scale
+            ];
+        }
+
+        /* =========================================================
+           RENDER
+           ========================================================= */
+
+        function render() {
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, W, H);
+
+            const frame = projectionFrame();
+
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+
+            for (const particle of particles) {
+                const [x, y] = project(particle.point, frame);
+                const size = particle.radius * 9;
+
+                ctx.globalAlpha = particle.alpha;
+
+                ctx.drawImage(
+                    sprites[particle.color],
+                    x - size / 2,
+                    y - size / 2,
+                    size,
+                    size
+                );
+            }
+
+            // Slightly brighter edge beads define the flower silhouette.
+            ctx.globalAlpha = 0.72;
+
+            for (const bead of edgePoints) {
+                const [x, y] = project(bead.point, frame);
+
+                ctx.drawImage(
+                    sprites[bead.color],
+                    x - 6,
+                    y - 6,
+                    12,
+                    12
+                );
+            }
+
+            ctx.restore();
+        }
+
+        /* =========================================================
+           PLAYBACK
+           ========================================================= */
+
+        function animate(now) {
+            const delta = (now - previousTime) / 1000;
+            previousTime = now;
+
+            if (!paused) {
+                turns = (turns + delta / settings.duration) % 1;
+            }
+
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        pauseButton.onclick = () => {
+            if (recording) return;
+
+            paused = !paused;
+            previousTime = performance.now();
+
+            pauseButton.textContent = paused ? "Play" : "Pause";
+        };
+
+        restartButton.onclick = () => {
+            if (recording) return;
+
+            turns = 0;
+            previousTime = performance.now();
+            render();
+        };
+
+        /* =========================================================
+           CONTROLS
+           ========================================================= */
+
+        function refreshControls() {
+            for (const key of [
+                "duration", "petals", "curl", "tilt",
+                "size", "glow", "colorA", "colorB"
+            ]) {
+                document.getElementById(key).value = settings[key];
+            }
+
+            document.getElementById("white").checked = settings.white;
+
+            document.getElementById("durationValue").textContent =
+                settings.duration;
+
+            document.getElementById("petalsValue").textContent =
+                settings.petals;
+
+            document.getElementById("curlValue").textContent =
+                settings.curl.toFixed(2);
+
+            document.getElementById("tiltValue").textContent =
+                settings.tilt + "°";
+
+            document.getElementById("sizeValue").textContent =
+                settings.size.toFixed(2);
+
+            document.getElementById("glowValue").textContent =
+                settings.glow.toFixed(2);
+        }
+
+        for (const key of [
+            "duration", "petals", "curl", "tilt", "size", "glow"
+        ]) {
+            document.getElementById(key).addEventListener("input", event => {
+                settings[key] = Number(event.target.value);
+
+                if (key === "petals" || key === "curl") {
+                    buildFlower();
+                }
+
+                if (key === "glow") {
+                    buildSprites();
+                }
+
+                refreshControls();
+                render();
+            });
+        }
+
+        for (const key of ["colorA", "colorB"]) {
+            document.getElementById(key).addEventListener("input", event => {
+                settings[key] = event.target.value;
+                buildSprites();
+                render();
+            });
+        }
+
+        document.getElementById("white").addEventListener("change", event => {
+            settings.white = event.target.checked;
+            buildSprites();
+            render();
+        });
+
+        resetButton.onclick = () => {
+            if (recording) return;
+
+            Object.assign(settings, DEFAULTS);
+            turns = 0;
+
+            refreshControls();
+            buildFlower();
+            buildSprites();
+            render();
+        };
+
+        /* =========================================================
+           SILENT RECORDING
+        
+           One full revolution. No microphone or audio tracks.
+           Real-time capture depends on browser and laptop performance.
+           ========================================================= */
+
+        recordButton.onclick = () => {
+            if (recording) return;
+
+            if (!window.MediaRecorder || !canvas.captureStream) {
+                status.textContent =
+                    "Recording is unavailable. Try a current Chrome or Edge browser.";
+                return;
+            }
+
+            const mimeType = [
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ].find(type => MediaRecorder.isTypeSupported(type));
+
+            if (!mimeType) {
+                status.textContent = "WebM export is unavailable in this browser.";
+                return;
+            }
+
+            let stream;
+            let recorder;
+            let timer;
+            let failed = false;
+            let hidden = false;
+            const chunks = [];
+
+            function watchVisibility() {
+                if (document.hidden) hidden = true;
+            }
+
+            function cleanup() {
+                clearTimeout(timer);
+
+                document.removeEventListener(
+                    "visibilitychange", watchVisibility
+                );
+
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
+                recording = false;
+                inputs.forEach(input => input.disabled = false);
+
+                pauseButton.disabled = false;
+                restartButton.disabled = false;
+                resetButton.disabled = false;
+                recordButton.disabled = false;
+
+                recordButton.textContent = "Record silent loop";
+            }
+
+            try {
+                paused = false;
+                pauseButton.textContent = "Pause";
+                turns = 0;
+                render();
+
+                stream = canvas.captureStream(settings.fps);
+
+                recorder = new MediaRecorder(stream, {
+                    mimeType,
+                    videoBitsPerSecond: settings.bitrate
+                });
+
+                recorder.ondataavailable = event => {
+                    if (event.data.size) chunks.push(event.data);
+                };
+
+                recorder.onerror = () => {
+                    failed = true;
+                    status.textContent = "Recording failed. Please try again.";
+                    cleanup();
+                };
+
+                recorder.onstop = () => {
+                    if (!failed && chunks.length) {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+
+                        link.href = url;
+                        link.download = "kevs-art-lab-phantom-bloom.webm";
+
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+
+                        setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+                        status.textContent = hidden
+                            ? "Downloaded. The tab was hidden; check for skipped frames."
+                            : "Downloaded: silent 1080 × 1920 WebM.";
+                    }
+
+                    cleanup();
+                };
+
+                recording = true;
+
+                inputs.forEach(input => input.disabled = true);
+                pauseButton.disabled = true;
+                restartButton.disabled = true;
+                resetButton.disabled = true;
+                recordButton.disabled = true;
+                recordButton.textContent = "Recording…";
+
+                status.textContent =
+                    `Recording ${settings.duration} seconds. Keep this tab visible.`;
+
+                document.addEventListener(
+                    "visibilitychange", watchVisibility
+                );
+
+                turns = 0;
+                previousTime = performance.now();
+                recorder.start();
+
+                timer = setTimeout(() => {
+                    if (recorder.state === "recording") {
+                        recorder.stop();
+                    }
+                }, settings.duration * 1000);
+
+            } catch (error) {
+                cleanup();
+                status.textContent = `Could not record: ${error.message}`;
+            }
+        };
+
+        /* Start */
+        refreshControls();
+        buildFlower();
+        buildSprites();
+        render();
+        requestAnimationFrame(animate);
+    </script>
+</body>
+
+</html>

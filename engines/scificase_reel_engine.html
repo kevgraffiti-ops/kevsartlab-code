@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sci-Fi Modular Staircase Reel Engine</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js and Postprocessing Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Space+Grotesk:wght@400;600&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #020204;
+            font-family: 'Space Grotesk', sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 5, 12, 0.8);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 136, 0, 0.4);
+            border-radius: 2px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 136, 0, 0.8);
+        }
+
+        .glass-panel {
+            background: rgba(6, 8, 16, 0.88);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 136, 0, 0.2);
+        }
+
+        .neon-border-amber {
+            border-color: rgba(255, 136, 0, 0.5);
+            box-shadow: 0 0 15px rgba(255, 136, 0, 0.15);
+        }
+
+        .btn-amber {
+            background: rgba(255, 136, 0, 0.12);
+            border: 1px solid rgba(255, 136, 0, 0.4);
+            color: #ffaa00;
+            transition: all 0.2s ease;
+        }
+
+        .btn-amber:hover {
+            background: rgba(255, 136, 0, 0.3);
+            border-color: rgba(255, 136, 0, 0.8);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(255, 136, 0, 0.3);
+        }
+
+        .btn-amber.active {
+            background: rgba(255, 136, 0, 0.4);
+            border-color: #ffaa00;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 136, 0, 0.5);
+        }
+
+        .viewport-container {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+
+<body class="flex h-screen w-screen overflow-hidden bg-black">
+
+    <!-- MAIN VIEWPORT / CANVAS FRAME -->
+    <main class="flex-1 flex items-center justify-center relative p-2 md:p-6 bg-neutral-950">
+        <!-- Frame Container -->
+        <div id="aspectFrame"
+            class="viewport-container relative overflow-hidden rounded-xl border border-amber-500/30 flex items-center justify-center shadow-2xl">
+            <!-- Three.js Canvas -->
+            <canvas id="webglCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+            <!-- Social Overlay Text (Optional Reel Captions) -->
+            <div id="reelOverlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-8 z-20">
+                <div class="text-center pt-4">
+                    <span id="overlayTag"
+                        class="inline-block px-3 py-1 rounded-full text-[10px] font-orbitron tracking-widest text-amber-400 bg-amber-950/60 border border-amber-500/40 uppercase">
+                        // MATRIX RECURSION
+                    </span>
+                    <h1 id="overlayTitle"
+                        class="text-2xl md:text-3xl font-black font-orbitron uppercase tracking-wider text-amber-300 drop-shadow-[0_0_10px_rgba(255,136,0,0.8)] mt-2">
+                        MONOLITHIC NEXUS
+                    </h1>
+                </div>
+
+                <div class="text-center pb-4">
+                    <p id="overlayHandle"
+                        class="text-xs font-orbitron font-bold text-amber-400 tracking-widest uppercase">
+                        @CYBER_ARCHITECTURE
+                    </p>
+                </div>
+            </div>
+
+            <!-- Recording HUD Badge -->
+            <div id="recordingBadge"
+                class="hidden absolute top-4 left-4 z-30 flex items-center gap-2 bg-red-600/90 text-white text-xs font-orbitron font-bold px-3 py-1.5 rounded-full shadow-lg shadow-red-500/50">
+                <span class="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
+                REC <span id="recTimer">00:00</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- STUDIO CONTROL PANEL -->
+    <aside class="w-80 md:w-96 glass-panel h-full flex flex-col border-l border-amber-500/20 z-30 shadow-2xl">
+        <!-- Panel Header -->
+        <div class="p-4 border-b border-amber-500/20 flex items-center justify-between bg-black/40">
+            <div class="flex items-center gap-2">
+                <div class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></div>
+                <h2 class="font-orbitron text-xs font-bold tracking-wider text-amber-400 uppercase">ESCHER STUDIO ENGINE
+                </h2>
+            </div>
+            <span class="text-[10px] font-orbitron text-amber-500/60">v3.5</span>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="grid grid-cols-4 gap-1 p-2 bg-black/60 border-b border-amber-500/20 text-[10px] font-orbitron">
+            <button data-tab="tabModules" class="tab-btn btn-amber active py-2 rounded text-center">MODULES</button>
+            <button data-tab="tabStyling" class="tab-btn btn-amber py-2 rounded text-center">STYLE</button>
+            <button data-tab="tabCamera" class="tab-btn btn-amber py-2 rounded text-center">CAMERA</button>
+            <button data-tab="tabExport" class="tab-btn btn-amber py-2 rounded text-center">EXPORT</button>
+        </div>
+
+        <!-- Scrollable Tab Contents -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-6">
+
+            <!-- TAB 1: MODULAR BUILDER (Add / Remove / Select Geometry) -->
+            <div id="tabModules" class="tab-content space-y-4">
+                <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider">// SPAWN MODULES
+                </h3>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnAddStairs"
+                        class="btn-amber p-2.5 rounded text-xs font-orbitron flex items-center justify-center gap-2">
+                        <span>+ Staircase</span>
+                    </button>
+                    <button id="btnAddPyramid"
+                        class="btn-amber p-2.5 rounded text-xs font-orbitron flex items-center justify-center gap-2">
+                        <span>+ Pyramid</span>
+                    </button>
+                    <button id="btnAddPlatform"
+                        class="btn-amber p-2.5 rounded text-xs font-orbitron flex items-center justify-center gap-2">
+                        <span>+ Platform</span>
+                    </button>
+                    <button id="btnAddPillar"
+                        class="btn-amber p-2.5 rounded text-xs font-orbitron flex items-center justify-center gap-2">
+                        <span>+ Pillar Frame</span>
+                    </button>
+                </div>
+
+                <div class="pt-2 border-t border-amber-500/20">
+                    <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider mb-2">//
+                        ACTIVE MODULES LIST</h3>
+                    <div id="moduleList" class="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                        <!-- Module item rows injected dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- Selected Module Transform Controls -->
+                <div id="transformControlsPanel"
+                    class="hidden space-y-3 p-3 rounded bg-amber-950/20 border border-amber-500/30">
+                    <div class="flex justify-between items-center">
+                        <span id="selectedModuleName" class="text-xs font-orbitron font-bold text-amber-300">STAIRCASE
+                            #1</span>
+                        <button id="btnDeleteSelected"
+                            class="text-[10px] font-orbitron text-red-400 hover:text-red-300 border border-red-500/30 px-2 py-0.5 rounded bg-red-950/40">DELETE</button>
+                    </div>
+
+                    <!-- Translation X/Y/Z -->
+                    <div class="space-y-1.5 text-[11px]">
+                        <div class="flex justify-between text-slate-400"><span>Position Y</span><span id="valPosY"
+                                class="text-amber-400">0</span></div>
+                        <input type="range" id="sliderPosY" min="-25" max="25" step="0.5" value="0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+
+                        <div class="flex justify-between text-slate-400"><span>Position X</span><span id="valPosX"
+                                class="text-amber-400">0</span></div>
+                        <input type="range" id="sliderPosX" min="-20" max="20" step="0.5" value="0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+
+                        <div class="flex justify-between text-slate-400"><span>Position Z</span><span id="valPosZ"
+                                class="text-amber-400">0</span></div>
+                        <input type="range" id="sliderPosZ" min="-20" max="20" step="0.5" value="0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+                    </div>
+
+                    <!-- Rotation Yaw/Pitch/Roll -->
+                    <div class="space-y-1.5 text-[11px] pt-1 border-t border-amber-500/20">
+                        <div class="flex justify-between text-slate-400"><span>Rotation Y (Yaw)</span><span id="valRotY"
+                                class="text-amber-400">0°</span></div>
+                        <input type="range" id="sliderRotY" min="0" max="360" step="15" value="0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+
+                        <div class="flex justify-between text-slate-400"><span>Pitch / Roll Snap</span><span
+                                id="valRotX" class="text-amber-400">0°</span></div>
+                        <input type="range" id="sliderRotX" min="-180" max="180" step="90" value="0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: STYLING, BLOOM & COLORS -->
+            <div id="tabStyling" class="tab-content hidden space-y-4">
+                <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider">// VECTOR COLOR
+                    THEMES</h3>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button data-theme="amber"
+                        class="theme-btn btn-amber active p-2 rounded text-left text-xs font-orbitron flex justify-between items-center">
+                        <span>AMBER VECTOR</span>
+                        <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    </button>
+                    <button data-theme="cyber"
+                        class="theme-btn btn-amber p-2 rounded text-left text-xs font-orbitron flex justify-between items-center">
+                        <span>CYBER CYAN</span>
+                        <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+                    </button>
+                    <button data-theme="matrix"
+                        class="theme-btn btn-amber p-2 rounded text-left text-xs font-orbitron flex justify-between items-center">
+                        <span>EMERALD MATRIX</span>
+                        <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                    </button>
+                    <button data-theme="monochrome"
+                        class="theme-btn btn-amber p-2 rounded text-left text-xs font-orbitron flex justify-between items-center">
+                        <span>PLATINUM VOID</span>
+                        <span class="w-3 h-3 rounded-full bg-slate-100"></span>
+                    </button>
+                </div>
+
+                <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider pt-2">// UNREAL
+                    BLOOM & SHADING</h3>
+
+                <div class="space-y-3 bg-black/40 p-3 rounded border border-amber-500/20">
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-slate-400">Bloom Strength</span>
+                            <span id="valBloomStrength" class="text-amber-400 font-orbitron">1.8</span>
+                        </div>
+                        <input type="range" id="sliderBloomStrength" min="0" max="4" step="0.1" value="1.8"
+                            class="w-full accent-amber-500 bg-neutral-800">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-slate-400">Wireframe Opacity</span>
+                            <span id="valWireOpacity" class="text-amber-400 font-orbitron">0.95</span>
+                        </div>
+                        <input type="range" id="sliderWireOpacity" min="0.2" max="1" step="0.05" value="0.95"
+                            class="w-full accent-amber-500 bg-neutral-800">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-[11px] mb-1">
+                            <span class="text-slate-400">Data Stream Particle Speed</span>
+                            <span id="valStreamSpeed" class="text-amber-400 font-orbitron">1.0x</span>
+                        </div>
+                        <input type="range" id="sliderStreamSpeed" min="0" max="3" step="0.1" value="1.0"
+                            class="w-full accent-amber-500 bg-neutral-800">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: CAMERA CHOREOGRAPHY -->
+            <div id="tabCamera" class="tab-content hidden space-y-4">
+                <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider">// CINEMATIC
+                    MOTION PATHS</h3>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button data-cam="orbit" class="cam-btn btn-amber active p-2 rounded text-xs font-orbitron">360°
+                        ORBIT</button>
+                    <button data-cam="vertical" class="cam-btn btn-amber p-2 rounded text-xs font-orbitron">VERTICAL
+                        FLY-THRU</button>
+                    <button data-cam="vertigo" class="cam-btn btn-amber p-2 rounded text-xs font-orbitron">VERTIGO
+                        ROLL</button>
+                    <button data-cam="manual" class="cam-btn btn-amber p-2 rounded text-xs font-orbitron">FREE
+                        MANUAL</button>
+                </div>
+
+                <div class="space-y-2 pt-2">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-slate-400">Auto Motion Speed</span>
+                        <span id="valCamSpeed" class="text-amber-400 font-orbitron">1.0x</span>
+                    </div>
+                    <input type="range" id="sliderCamSpeed" min="0" max="3" step="0.1" value="1.0"
+                        class="w-full accent-amber-500 bg-neutral-800">
+                </div>
+            </div>
+
+            <!-- TAB 4: EXPORT & FORMAT -->
+            <div id="tabExport" class="tab-content hidden space-y-4">
+                <h3 class="text-xs font-orbitron font-semibold text-amber-400 uppercase tracking-wider">// EXPORT & REEL
+                    RENDER</h3>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnRecord"
+                        class="flex items-center justify-center gap-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/40 py-2.5 px-3 rounded font-orbitron text-xs font-bold transition-all">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span>RECORD REEL</span>
+                    </button>
+                    <button id="btnScreenshot"
+                        class="flex items-center justify-center gap-2 btn-amber py-2.5 px-3 rounded font-orbitron text-xs font-bold">
+                        📷 <span>PNG SNAP</span>
+                    </button>
+                </div>
+
+                <div class="space-y-2 pt-2">
+                    <label class="text-[10px] text-slate-400 uppercase block">Canvas Framing Ratio</label>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button data-aspect="9:16"
+                            class="aspect-btn btn-amber active py-1.5 rounded text-[10px] font-orbitron">9:16
+                            Reel</button>
+                        <button data-aspect="1:1"
+                            class="aspect-btn btn-amber py-1.5 rounded text-[10px] font-orbitron">1:1 Square</button>
+                        <button data-aspect="16:9"
+                            class="aspect-btn btn-amber py-1.5 rounded text-[10px] font-orbitron">16:9
+                            Landscape</button>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-amber-500/20">
+                    <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+                        <span>Show Reel Captions Overlay</span>
+                        <input type="checkbox" id="chkShowOverlays" checked class="accent-amber-500">
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div
+            class="p-3 border-t border-amber-500/20 bg-black/60 text-center flex justify-between items-center text-[10px] text-amber-500/60 font-orbitron">
+            <span>UNREAL BLOOM ENGINE</span>
+            <span>THREE.JS R128</span>
+        </div>
+    </aside>
+
+    <!-- JAVASCRIPT APP CODE -->
+    <script>
+        // --- 1. GLOBAL ENGINE STATE ---
+        const canvas = document.getElementById('webglCanvas');
+        const aspectFrame = document.getElementById('aspectFrame');
+
+        let scene, camera, renderer, composer, bloomPass, controls;
+        let clock = new THREE.Clock();
+
+        // Object Registry for Interactive Scene Editing
+        let sceneModules = []; // Holds metadata for added objects
+        let selectedModuleId = null;
+
+        let dataStreamGroup;
+        let activeCamMode = 'orbit';
+        let camSpeed = 1.0;
+        let streamSpeed = 1.0;
+
+        // Vector Color Palette Definitions
+        const PALETTES = {
+            amber: { primary: 0xff8800, secondary: 0xaa3300, fill: 0x331100, name: 'Amber Vector' },
+            cyber: { primary: 0x00f3ff, secondary: 0xff00ff, fill: 0x001133, name: 'Cyber Cyan' },
+            matrix: { primary: 0x00ff66, secondary: 0x00aa44, fill: 0x002200, name: 'Emerald Matrix' },
+            monochrome: { primary: 0xffffff, secondary: 0x888888, fill: 0x111111, name: 'Platinum Void' }
+        };
+        let currentPalette = PALETTES.amber;
+
+        // Recording Engine State
+        let mediaRecorder, recordedChunks = [], isRecording = false, recStartTime = 0, recTimerInterval;
+
+        // --- 2. THREE.JS & POST-PROCESSING SETUP ---
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x020204, 0.015);
+
+            camera = new THREE.PerspectiveCamera(50, 9 / 16, 0.1, 1000);
+            camera.position.set(0, 12, 32);
+
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                antialias: true,
+                preserveDrawingBuffer: true
+            });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Orbit Controls
+            controls = new THREE.OrbitControls(camera, canvas);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 1.5;
+
+            // UNREAL BLOOM POST PROCESSING
+            const renderScene = new THREE.RenderPass(scene, camera);
+            bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+                1.8, // Strength
+                0.4, // Radius
+                0.15 // Threshold
+            );
+
+            composer = new THREE.EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // Container for light pulses
+            dataStreamGroup = new THREE.Group();
+            scene.add(dataStreamGroup);
+
+            // Build Initial Scene Layout matching the reference image
+            buildDefaultMonolithLayout();
+            buildDataStreams();
+
+            updateAspectRatio('9:16');
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // --- 3. GEOMETRY GENERATORS ---
+
+        // Create precise Staircase Segment
+        function createStaircaseMesh(steps = 12, stepWidth = 4, stepHeight = 0.5, stepDepth = 0.9) {
+            const group = new THREE.Group();
+
+            for (let i = 0; i < steps; i++) {
+                const boxGeo = new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth);
+                const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: currentPalette.primary,
+                    transparent: true,
+                    opacity: 0.95
+                });
+                const line = new THREE.LineSegments(edgesGeo, lineMat);
+
+                const fillMat = new THREE.MeshBasicMaterial({
+                    color: currentPalette.fill,
+                    transparent: true,
+                    opacity: 0.25,
+                    side: THREE.DoubleSide
+                });
+                const fillMesh = new THREE.Mesh(boxGeo, fillMat);
+
+                const stepGroup = new THREE.Group();
+                stepGroup.add(line);
+                stepGroup.add(fillMesh);
+                stepGroup.position.set(0, i * stepHeight, i * stepDepth);
+                group.add(stepGroup);
+            }
+            return group;
+        }
+
+        // Create Pyramid Center Artifact (as seen in reference image)
+        function createPyramidMesh(size = 6) {
+            const group = new THREE.Group();
+            const pyrGeo = new THREE.ConeGeometry(size, size * 1.2, 4);
+            const edgesGeo = new THREE.EdgesGeometry(pyrGeo);
+
+            const lineMat = new THREE.LineBasicMaterial({ color: currentPalette.primary });
+            const line = new THREE.LineSegments(edgesGeo, lineMat);
+
+            const fillMat = new THREE.MeshBasicMaterial({ color: currentPalette.secondary, transparent: true, opacity: 0.6 });
+            const fillMesh = new THREE.Mesh(pyrGeo, fillMat);
+
+            group.add(line);
+            group.add(fillMesh);
+            return group;
+        }
+
+        // Create Square Platform Frame
+        function createPlatformMesh(size = 10) {
+            const group = new THREE.Group();
+            const boxGeo = new THREE.BoxGeometry(size, 0.4, size);
+            const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+
+            const lineMat = new THREE.LineBasicMaterial({ color: currentPalette.primary });
+            const line = new THREE.LineSegments(edgesGeo, lineMat);
+
+            const fillMat = new THREE.MeshBasicMaterial({ color: currentPalette.fill, transparent: true, opacity: 0.3 });
+            const fillMesh = new THREE.Mesh(boxGeo, fillMat);
+
+            group.add(line);
+            group.add(fillMesh);
+            return group;
+        }
+
+        // Create Vertical Pillar Columns
+        function createPillarMesh(height = 30) {
+            const group = new THREE.Group();
+            const boxGeo = new THREE.BoxGeometry(0.6, height, 0.6);
+            const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+
+            const lineMat = new THREE.LineBasicMaterial({ color: currentPalette.primary });
+            const line = new THREE.LineSegments(edgesGeo, lineMat);
+
+            group.add(line);
+            return group;
+        }
+
+        // --- 4. MODULAR SCENE MANAGER ---
+
+        function addModuleToScene(type, name, transform = {}) {
+            let mesh;
+            if (type === 'staircase') mesh = createStaircaseMesh();
+            else if (type === 'pyramid') mesh = createPyramidMesh();
+            else if (type === 'platform') mesh = createPlatformMesh();
+            else if (type === 'pillar') mesh = createPillarMesh();
+
+            const id = 'mod_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            mesh.name = id;
+
+            if (transform.pos) mesh.position.set(...transform.pos);
+            if (transform.rot) mesh.rotation.set(...transform.rot);
+
+            scene.add(mesh);
+
+            const moduleData = { id, name: name || `${type.toUpperCase()} #${sceneModules.length + 1}`, type, mesh };
+            sceneModules.push(moduleData);
+
+            updateModuleListUI();
+            selectModule(id);
+        }
+
+        function removeModule(id) {
+            const index = sceneModules.findIndex(m => m.id === id);
+            if (index !== -1) {
+                scene.remove(sceneModules[index].mesh);
+                sceneModules.splice(index, 1);
+                if (selectedModuleId === id) {
+                    selectedModuleId = null;
+                    document.getElementById('transformControlsPanel').classList.add('hidden');
+                }
+                updateModuleListUI();
+            }
+        }
+
+        function selectModule(id) {
+            selectedModuleId = id;
+            const mod = sceneModules.find(m => m.id === id);
+            if (!mod) return;
+
+            document.querySelectorAll('.module-item-btn').forEach(el => {
+                el.classList.toggle('active', el.getAttribute('data-id') === id);
+            });
+
+            const panel = document.getElementById('transformControlsPanel');
+            panel.classList.remove('hidden');
+
+            document.getElementById('selectedModuleName').textContent = mod.name;
+            document.getElementById('sliderPosY').value = mod.mesh.position.y;
+            document.getElementById('sliderPosX').value = mod.mesh.position.x;
+            document.getElementById('sliderPosZ').value = mod.mesh.position.z;
+
+            document.getElementById('valPosY').textContent = mod.mesh.position.y;
+            document.getElementById('valPosX').textContent = mod.mesh.position.x;
+            document.getElementById('valPosZ').textContent = mod.mesh.position.z;
+
+            const rotYDeg = Math.round(THREE.MathUtils.radToDeg(mod.mesh.rotation.y));
+            document.getElementById('sliderRotY').value = rotYDeg;
+            document.getElementById('valRotY').textContent = `${rotYDeg}°`;
+        }
+
+        function buildDefaultMonolithLayout() {
+            // Clear existing
+            sceneModules.forEach(m => scene.remove(m.mesh));
+            sceneModules = [];
+
+            // Build Tiered Architecture matching the image
+            // 4 Corner Vertical Pillars
+            addModuleToScene('pillar', 'Pillar NW', { pos: [-6, 0, -6] });
+            addModuleToScene('pillar', 'Pillar NE', { pos: [6, 0, -6] });
+            addModuleToScene('pillar', 'Pillar SW', { pos: [-6, 0, 6] });
+            addModuleToScene('pillar', 'Pillar SE', { pos: [6, 0, 6] });
+
+            // Center Platforms
+            addModuleToScene('platform', 'Mid Platform', { pos: [0, 0, 0] });
+            addModuleToScene('platform', 'Top Platform', { pos: [0, 10, 0] });
+            addModuleToScene('platform', 'Bottom Platform', { pos: [0, -10, 0] });
+
+            // Center Pyramid
+            addModuleToScene('pyramid', 'Central Pyramid', { pos: [0, 0.5, 0] });
+
+            // Interconnecting Stairs
+            addModuleToScene('staircase', 'Staircase Tier 1', { pos: [-5, -10, 2], rot: [0, 0, 0] });
+            addModuleToScene('staircase', 'Staircase Tier 2', { pos: [2, -10, 5], rot: [0, Math.PI / 2, 0] });
+            addModuleToScene('staircase', 'Staircase Tier 3', { pos: [-2, 0, -5], rot: [0, -Math.PI / 2, 0] });
+            addModuleToScene('staircase', 'Staircase Tier 4', { pos: [5, 0, -2], rot: [0, Math.PI, 0] });
+        }
+
+        // --- 5. LIGHT PACKET DATA STREAMS ---
+        function buildDataStreams() {
+            while (dataStreamGroup.children.length > 0) dataStreamGroup.remove(dataStreamGroup.children[0]);
+
+            const count = 40;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                pos[i * 3] = (Math.random() - 0.5) * 16;
+                pos[i * 3 + 1] = (Math.random() - 0.5) * 30;
+                pos[i * 3 + 2] = (Math.random() - 0.5) * 16;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+            const mat = new THREE.PointsMaterial({
+                color: currentPalette.primary,
+                size: 0.6,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+
+            const particles = new THREE.Points(geo, mat);
+            dataStreamGroup.add(particles);
+        }
+
+        // --- 6. ANIMATION & RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // Camera Mode Behavior
+            if (activeCamMode === 'orbit') {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 1.5 * camSpeed;
+                controls.update();
+            } else if (activeCamMode === 'vertical') {
+                controls.autoRotate = false;
+                camera.position.y = Math.sin(time * 0.4 * camSpeed) * 18;
+                camera.position.x = Math.cos(time * 0.2 * camSpeed) * 25;
+                camera.position.z = Math.sin(time * 0.2 * camSpeed) * 25;
+                controls.target.set(0, 0, 0);
+                controls.update();
+            } else if (activeCamMode === 'vertigo') {
+                controls.autoRotate = false;
+                camera.rotation.z = Math.sin(time * 0.8 * camSpeed) * 0.35;
+                controls.update();
+            }
+
+            // Animate Data Stream Light Packets
+            if (dataStreamGroup.children[0]) {
+                const pos = dataStreamGroup.children[0].geometry.attributes.position.array;
+                for (let i = 1; i < pos.length; i += 3) {
+                    pos[i] += 0.12 * streamSpeed;
+                    if (pos[i] > 18) pos[i] = -18;
+                }
+                dataStreamGroup.children[0].geometry.attributes.position.needsUpdate = true;
+            }
+
+            // Render via UnrealBloom Composer
+            composer.render();
+        }
+
+        // --- 7. UI EVENT HANDLERS & BINDINGS ---
+        function updateModuleListUI() {
+            const listContainer = document.getElementById('moduleList');
+            listContainer.innerHTML = '';
+
+            sceneModules.forEach(mod => {
+                const row = document.createElement('div');
+                row.className = `module-item-btn btn-amber p-2 rounded text-xs font-orbitron flex justify-between items-center cursor-pointer ${mod.id === selectedModuleId ? 'active' : ''}`;
+                row.setAttribute('data-id', mod.id);
+                row.innerHTML = `
+                    <span>${mod.name}</span>
+                    <span class="text-[9px] text-amber-500/70 uppercase">${mod.type}</span>
+                `;
+                row.addEventListener('click', () => selectModule(mod.id));
+                listContainer.appendChild(row);
+            });
+        }
+
+        function setupUI() {
+            // Tab Switcher
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+                    btn.classList.add('active');
+                    document.getElementById(btn.getAttribute('data-tab')).classList.remove('hidden');
+                });
+            });
+
+            // Add Module Buttons
+            document.getElementById('btnAddStairs').addEventListener('click', () => addModuleToScene('staircase', 'Staircase'));
+            document.getElementById('btnAddPyramid').addEventListener('click', () => addModuleToScene('pyramid', 'Pyramid Core'));
+            document.getElementById('btnAddPlatform').addEventListener('click', () => addModuleToScene('platform', 'Platform'));
+            document.getElementById('btnAddPillar').addEventListener('click', () => addModuleToScene('pillar', 'Pillar Column'));
+
+            // Delete Selected
+            document.getElementById('btnDeleteSelected').addEventListener('click', () => {
+                if (selectedModuleId) removeModule(selectedModuleId);
+            });
+
+            // Position & Rotation Sliders Binding
+            ['PosX', 'PosY', 'PosZ'].forEach(axis => {
+                const slider = document.getElementById(`slider${axis}`);
+                slider.addEventListener('input', (e) => {
+                    if (!selectedModuleId) return;
+                    const mod = sceneModules.find(m => m.id === selectedModuleId);
+                    if (mod) {
+                        const val = parseFloat(e.target.value);
+                        mod.mesh.position[axis.slice(-1).toLowerCase()] = val;
+                        document.getElementById(`val${axis}`).textContent = val;
+                    }
+                });
+            });
+
+            document.getElementById('sliderRotY').addEventListener('input', (e) => {
+                if (!selectedModuleId) return;
+                const mod = sceneModules.find(m => m.id === selectedModuleId);
+                if (mod) {
+                    const deg = parseFloat(e.target.value);
+                    mod.mesh.rotation.y = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('valRotY').textContent = `${deg}°`;
+                }
+            });
+
+            document.getElementById('sliderRotX').addEventListener('input', (e) => {
+                if (!selectedModuleId) return;
+                const mod = sceneModules.find(m => m.id === selectedModuleId);
+                if (mod) {
+                    const deg = parseFloat(e.target.value);
+                    mod.mesh.rotation.x = THREE.MathUtils.degToRad(deg);
+                    document.getElementById('valRotX').textContent = `${deg}°`;
+                }
+            });
+
+            // Theme Switcher
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    currentPalette = PALETTES[btn.getAttribute('data-theme')];
+
+                    // Re-apply theme colors to all meshes
+                    sceneModules.forEach(mod => {
+                        mod.mesh.traverse(child => {
+                            if (child.isLineSegments) child.material.color.setHex(currentPalette.primary);
+                            if (child.isMesh) child.material.color.setHex(currentPalette.fill);
+                        });
+                    });
+
+                    buildDataStreams();
+                });
+            });
+
+            // Bloom Slider
+            document.getElementById('sliderBloomStrength').addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                bloomPass.strength = val;
+                document.getElementById('valBloomStrength').textContent = val.toFixed(1);
+            });
+
+            // Wireframe Opacity
+            document.getElementById('sliderWireOpacity').addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                sceneModules.forEach(mod => {
+                    mod.mesh.traverse(child => {
+                        if (child.isLineSegments) child.material.opacity = val;
+                    });
+                });
+                document.getElementById('valWireOpacity').textContent = val.toFixed(2);
+            });
+
+            // Data Stream Speed
+            document.getElementById('sliderStreamSpeed').addEventListener('input', e => {
+                streamSpeed = parseFloat(e.target.value);
+                document.getElementById('valStreamSpeed').textContent = streamSpeed.toFixed(1) + 'x';
+            });
+
+            // Camera Modes
+            document.querySelectorAll('.cam-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    activeCamMode = btn.getAttribute('data-cam');
+                });
+            });
+
+            document.getElementById('sliderCamSpeed').addEventListener('input', e => {
+                camSpeed = parseFloat(e.target.value);
+                document.getElementById('valCamSpeed').textContent = camSpeed.toFixed(1) + 'x';
+            });
+
+            // Aspect Ratios
+            document.querySelectorAll('.aspect-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.aspect-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateAspectRatio(btn.getAttribute('data-aspect'));
+                });
+            });
+
+            // Overlays Toggle
+            document.getElementById('chkShowOverlays').addEventListener('change', e => {
+                document.getElementById('reelOverlay').style.display = e.target.checked ? 'flex' : 'none';
+            });
+
+            // Recording & Screenshot
+            document.getElementById('btnScreenshot').addEventListener('click', takeScreenshot);
+            document.getElementById('btnRecord').addEventListener('click', toggleRecording);
+        }
+
+        // --- 8. ASPECT RATIO & EXPORT ENGINE ---
+        function updateAspectRatio(ratioStr) {
+            let width, height;
+            const containerHeight = aspectFrame.parentElement.clientHeight - 32;
+
+            if (ratioStr === '9:16') {
+                height = containerHeight;
+                width = height * (9 / 16);
+            } else if (ratioStr === '1:1') {
+                height = Math.min(containerHeight, aspectFrame.parentElement.clientWidth - 32);
+                width = height;
+            } else if (ratioStr === '16:9') {
+                width = Math.min(aspectFrame.parentElement.clientWidth - 32, containerHeight * (16 / 9));
+                height = width * (9 / 16);
+            }
+
+            aspectFrame.style.width = `${width}px`;
+            aspectFrame.style.height = `${height}px`;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+        }
+
+        function onWindowResize() {
+            const activeBtn = document.querySelector('.aspect-btn.active');
+            const ratio = activeBtn ? activeBtn.getAttribute('data-aspect') : '9:16';
+            updateAspectRatio(ratio);
+        }
+
+        function takeScreenshot() {
+            composer.render();
+            const link = document.createElement('a');
+            link.download = `vector-staircase-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function toggleRecording() {
+            if (!isRecording) {
+                recordedChunks = [];
+                const stream = canvas.captureStream(60);
+                let options = { mimeType: 'video/webm;codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
+
+                try {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                } catch (e) {
+                    alert('MediaRecorder initialization failed: ' + e);
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = exportVideo;
+                mediaRecorder.start();
+                isRecording = true;
+
+                document.getElementById('btnRecord').classList.add('bg-red-600', 'text-white');
+                document.getElementById('recordingBadge').classList.remove('hidden');
+                recStartTime = Date.now();
+                recTimerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+                    const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                    const secs = String(elapsed % 60).padStart(2, '0');
+                    document.getElementById('recTimer').textContent = `${mins}:${secs}`;
+                }, 1000);
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('btnRecord').classList.remove('bg-red-600', 'text-white');
+                document.getElementById('recordingBadge').classList.add('hidden');
+                clearInterval(recTimerInterval);
+            }
+        }
+
+        function exportVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `staircase-monolith-reel-${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize on Load
+        window.onload = () => {
+            initScene();
+            setupUI();
+            animate();
+        };
+    </script>
+</body>
+
+</html>

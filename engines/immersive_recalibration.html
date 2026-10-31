@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypnotic Multi-Color Staircase Descent</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #e0e6ed;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            position: relative;
+        }
+
+        .viewport-frame {
+            position: relative;
+            background: #000;
+            box-shadow: 0 0 80px rgba(0, 0, 0, 0.95);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .viewport-frame.aspect-9-16 {
+            width: calc(100vh * (9/16));
+            height: 100vh;
+            max-width: 100vw;
+        }
+
+        .viewport-frame.aspect-1-1 {
+            width: 90vh;
+            height: 90vh;
+            max-width: 90vw;
+            max-height: 90vw;
+        }
+
+        .viewport-frame.aspect-16-9 {
+            width: 100vw;
+            height: calc(100vw * (9/16));
+            max-height: 100vh;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        #hud-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 310px;
+            background: rgba(4, 8, 15, 0.88);
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 8px;
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
+        #hud-panel.collapsed {
+            transform: translateX(-340px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #00f3ff;
+        }
+
+        .panel-content {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #7a8b9e;
+            display: flex;
+            justify-content: space-between;
+            text-transform: uppercase;
+        }
+
+        .control-label span.val {
+            color: #00f3ff;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00f3ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00f3ff;
+        }
+
+        select,
+        button {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e0e6ed;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        select:hover,
+        button:hover {
+            border-color: #00f3ff;
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        .btn-record {
+            background: rgba(255, 50, 80, 0.15);
+            border-color: #ff3355;
+            color: #ff3355;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .btn-record.recording {
+            background: #ff3355;
+            color: #fff;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 51, 85, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 51, 85, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 51, 85, 0);
+            }
+        }
+
+        .toggle-ui-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 99;
+            background: rgba(4, 8, 15, 0.8);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            color: #00f3ff;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+</head>
+
+<body>
+
+    <button class="toggle-ui-btn" id="toggle-ui" title="Toggle Controls (Key: H)">⚙️</button>
+
+    <div id="hud-panel">
+        <div class="panel-header">
+            <div class="panel-title">HYPNOTIC DESCENT REEL</div>
+        </div>
+
+        <div class="panel-content">
+            <div class="control-group">
+                <div class="control-label">COLOR CYCLE SPEED <span class="val" id="val-color-speed">1.0</span></div>
+                <input type="range" id="param-color-speed" min="0.0" max="3.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">DESCENT SPEED <span class="val" id="val-speed">1.2</span></div>
+                <input type="range" id="param-speed" min="0.1" max="3.0" step="0.1" value="1.2">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">BLOOM GLOW <span class="val" id="val-bloom">2.8</span></div>
+                <input type="range" id="param-bloom" min="0.5" max="5.0" step="0.1" value="2.8">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">FOG DENSITY <span class="val" id="val-fog">0.02</span></div>
+                <input type="range" id="param-fog" min="0.005" max="0.06" step="0.005" value="0.02">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">CAMERA MOTION MODE</div>
+                <select id="select-cam-mode">
+                    <option value="vortex">Hypnotic Vortex Plunge</option>
+                    <option value="infinite-descent">Smooth Infinite Descent</option>
+                    <option value="manual">Manual Exploration</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">CANVAS ASPECT RATIO</div>
+                <select id="select-aspect">
+                    <option value="aspect-9-16">9:16 Vertical Reel</option>
+                    <option value="aspect-1-1">1:1 Square</option>
+                    <option value="aspect-16-9">16:9 Landscape</option>
+                </select>
+            </div>
+
+            <button id="btn-record" class="btn-record">⏺ Record WebM Reel</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="viewport" class="viewport-frame aspect-9-16"></div>
+    </div>
+
+    <script>
+        const config = {
+            descentSpeed: 1.2,
+            colorCycleSpeed: 1.0,
+            bloomStrength: 2.8,
+            fogDensity: 0.02,
+            camMode: 'vortex'
+        };
+
+        const viewport = document.getElementById('viewport');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.FogExp2(0x020205, config.fogDensity);
+
+        const camera = new THREE.PerspectiveCamera(60, viewport.clientWidth / viewport.clientHeight, 0.1, 300);
+        camera.position.set(0, 0, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.3;
+        viewport.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        const renderPass = new THREE.RenderPass(scene, camera);
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(viewport.clientWidth, viewport.clientHeight),
+            config.bloomStrength,
+            0.6,
+            0.75
+        );
+
+        const ChromaticAberrationShader = {
+            uniforms: {
+                "tDiffuse": { value: null },
+                "amount": { value: 0.005 }
+            },
+            vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+            fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float amount;
+        varying vec2 vUv;
+        void main() {
+          vec2 offset = amount * (vUv - 0.5);
+          vec4 cr = texture2D(tDiffuse, vUv + offset);
+          vec4 cga = texture2D(tDiffuse, vUv);
+          vec4 cb = texture2D(tDiffuse, vUv - offset);
+          gl_FragColor = vec4(cr.r, cga.g, cb.b, cga.a);
+        }
+      `
+        };
+
+        const chromPass = new THREE.ShaderPass(ChromaticAberrationShader);
+
+        const composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+        composer.addPass(chromPass);
+
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        const TIER_HEIGHT = 16;
+        const TOTAL_TIERS = 10;
+        const staircaseMaterials = [];
+
+        function buildStaircaseSegment(baseHue) {
+            const group = new THREE.Group();
+            const steps = 14;
+            const width = 5;
+            const height = 8;
+            const depth = 8;
+            const stepH = height / steps;
+            const stepD = depth / steps;
+
+            const lineMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color().setHSL(baseHue, 1.0, 0.5),
+                linewidth: 1.5,
+                transparent: true,
+                opacity: 0.95
+            });
+
+            const fillMat = new THREE.MeshBasicMaterial({
+                color: new THREE.Color().setHSL(baseHue, 1.0, 0.08),
+                transparent: true,
+                opacity: 0.25,
+                side: THREE.DoubleSide
+            });
+
+            staircaseMaterials.push({ lineMat, fillMat, baseHue });
+
+            for (let i = 0; i < steps; i++) {
+                const geo = new THREE.BoxGeometry(width, stepH, stepD);
+                const edges = new THREE.EdgesGeometry(geo);
+                const line = new THREE.LineSegments(edges, lineMat);
+                const mesh = new THREE.Mesh(geo, fillMat);
+
+                const step = new THREE.Group();
+                step.add(line);
+                step.add(mesh);
+                step.position.set(0, i * stepH, i * stepD - depth / 2);
+                group.add(step);
+            }
+            return group;
+        }
+
+        function buildPyramidCore(baseHue) {
+            const group = new THREE.Group();
+            const geo = new THREE.OctahedronGeometry(3.5, 0);
+            const edges = new THREE.EdgesGeometry(geo);
+
+            const lineMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color().setHSL(baseHue, 1.0, 0.6),
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            const fillMat = new THREE.MeshBasicMaterial({
+                color: new THREE.Color().setHSL(baseHue, 1.0, 0.1),
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+
+            staircaseMaterials.push({ lineMat, fillMat, baseHue });
+
+            const line = new THREE.LineSegments(edges, lineMat);
+            const mesh = new THREE.Mesh(geo, fillMat);
+            group.add(line);
+            group.add(mesh);
+            return group;
+        }
+
+        function buildSingleTier(yPos, tierIndex) {
+            const tierGroup = new THREE.Group();
+            tierGroup.position.y = yPos;
+
+            const pillarGeo = new THREE.CylinderGeometry(0.08, 0.08, TIER_HEIGHT, 6);
+            const pillarEdges = new THREE.EdgesGeometry(pillarGeo);
+            const radius = 7;
+
+            const pillarHue = (tierIndex * 0.1) % 1.0;
+            const pillarMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color().setHSL(pillarHue, 0.8, 0.4),
+                transparent: true,
+                opacity: 0.4
+            });
+
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2 + (tierIndex * 0.2);
+                const px = Math.cos(angle) * radius;
+                const pz = Math.sin(angle) * radius;
+                const pLine = new THREE.LineSegments(pillarEdges, pillarMat);
+                pLine.position.set(px, 0, pz);
+                tierGroup.add(pLine);
+            }
+
+            const rotationOffset = tierIndex * (Math.PI / 2);
+
+            const hue1 = (tierIndex * 0.15) % 1.0;
+            const hue2 = (tierIndex * 0.15 + 0.33) % 1.0;
+            const hue3 = (tierIndex * 0.15 + 0.66) % 1.0;
+
+            const s1 = buildStaircaseSegment(hue1);
+            s1.position.set(-2, -4, -2);
+            s1.rotation.y = rotationOffset;
+            tierGroup.add(s1);
+
+            const s2 = buildStaircaseSegment(hue2);
+            s2.position.set(2, 0, 2);
+            s2.rotation.y = rotationOffset + Math.PI / 2;
+            tierGroup.add(s2);
+
+            const core = buildPyramidCore(hue3);
+            core.position.set(0, 0, 0);
+            core.userData = { isCore: true };
+            tierGroup.add(core);
+
+            return tierGroup;
+        }
+
+        function initWorld() {
+            for (let i = 0; i < TOTAL_TIERS; i++) {
+                const yPos = -i * TIER_HEIGHT;
+                const tier = buildSingleTier(yPos, i);
+                worldGroup.add(tier);
+            }
+        }
+
+        let dustParticles;
+        function initDustField() {
+            const count = 400;
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+
+            for (let i = 0; i < count * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 35;
+                positions[i + 1] = (Math.random() - 0.5) * (TOTAL_TIERS * TIER_HEIGHT);
+                positions[i + 2] = (Math.random() - 0.5) * 35;
+
+                const c = new THREE.Color().setHSL(Math.random(), 1.0, 0.6);
+                colors[i] = c.r;
+                colors[i + 1] = c.g;
+                colors[i + 2] = c.b;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const mat = new THREE.PointsMaterial({
+                size: 0.3,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            dustParticles = new THREE.Points(geo, mat);
+            scene.add(dustParticles);
+        }
+
+        const hudPanel = document.getElementById('hud-panel');
+        document.getElementById('toggle-ui').addEventListener('click', () => hudPanel.classList.toggle('collapsed'));
+        window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'h') hudPanel.classList.toggle('collapsed'); });
+
+        document.getElementById('param-color-speed').addEventListener('input', (e) => {
+            config.colorCycleSpeed = parseFloat(e.target.value);
+            document.getElementById('val-color-speed').innerText = config.colorCycleSpeed;
+        });
+        document.getElementById('param-speed').addEventListener('input', (e) => {
+            config.descentSpeed = parseFloat(e.target.value);
+            document.getElementById('val-speed').innerText = config.descentSpeed;
+        });
+        document.getElementById('param-bloom').addEventListener('input', (e) => {
+            config.bloomStrength = parseFloat(e.target.value);
+            bloomPass.strength = config.bloomStrength;
+            document.getElementById('val-bloom').innerText = config.bloomStrength;
+        });
+        document.getElementById('param-fog').addEventListener('input', (e) => {
+            config.fogDensity = parseFloat(e.target.value);
+            scene.fog.density = config.fogDensity;
+            document.getElementById('val-fog').innerText = config.fogDensity;
+        });
+        document.getElementById('select-cam-mode').addEventListener('change', (e) => config.camMode = e.target.value);
+
+        document.getElementById('select-aspect').addEventListener('change', (e) => {
+            viewport.className = `viewport-frame ${e.target.value}`;
+            resize();
+        });
+
+        function resize() {
+            const w = viewport.clientWidth;
+            const h = viewport.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            composer.setSize(w, h);
+        }
+        window.addEventListener('resize', resize);
+
+        let mediaRecorder = null;
+        let chunks = [];
+        const recordBtn = document.getElementById('btn-record');
+
+        recordBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            } else {
+                chunks = [];
+                const stream = renderer.domElement.captureStream(60);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+
+                mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `hypnotic-staircase-${Date.now()}.webm`;
+                    a.click();
+                    recordBtn.classList.remove('recording');
+                    recordBtn.innerText = '⏺ Record WebM Reel';
+                };
+
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+                recordBtn.innerText = '⏹ Stop & Save Video';
+            }
+        });
+
+        let clock = new THREE.Clock();
+        let currentY = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            if (config.colorCycleSpeed > 0) {
+                staircaseMaterials.forEach((item) => {
+                    const dynamicHue = (item.baseHue + elapsed * 0.1 * config.colorCycleSpeed) % 1.0;
+                    item.lineMat.color.setHSL(dynamicHue, 1.0, 0.55);
+                    item.fillMat.color.setHSL(dynamicHue, 1.0, 0.08);
+                });
+            }
+
+            worldGroup.traverse(child => {
+                if (child.userData.isCore) {
+                    child.rotation.y += delta * 0.8;
+                    child.rotation.z += delta * 0.4;
+                    const scale = 1 + Math.sin(elapsed * 4) * 0.12;
+                    child.scale.set(scale, scale, scale);
+                }
+            });
+
+            if (dustParticles) {
+                const pos = dustParticles.geometry.attributes.position.array;
+                for (let i = 1; i < pos.length; i += 3) {
+                    pos[i] += config.descentSpeed * 0.25;
+                    if (pos[i] > 10) pos[i] = -(TOTAL_TIERS * TIER_HEIGHT);
+                }
+                dustParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (config.camMode === 'vortex') {
+                currentY -= config.descentSpeed * delta * 10;
+                const loopRange = TIER_HEIGHT * 2;
+                if (currentY < -loopRange) currentY += loopRange;
+
+                const radius = 9;
+                camera.position.y = currentY;
+                camera.position.x = Math.sin(elapsed * 1.5) * radius;
+                camera.position.z = Math.cos(elapsed * 1.5) * radius;
+                camera.rotation.z = Math.sin(elapsed * 0.8) * 0.2;
+                camera.lookAt(0, currentY - 5, 0);
+
+            } else if (config.camMode === 'infinite-descent') {
+                currentY -= config.descentSpeed * delta * 8;
+                const loopRange = TIER_HEIGHT * 2;
+                if (currentY < -loopRange) currentY += loopRange;
+
+                camera.position.y = currentY;
+                camera.position.x = Math.sin(elapsed * 0.4) * 5;
+                camera.position.z = Math.cos(elapsed * 0.4) * 14 + 3;
+                camera.lookAt(0, currentY - 6, 0);
+
+            } else {
+                controls.update();
+            }
+
+            composer.render();
+        }
+
+        initWorld();
+        initDustField();
+        resize();
+        animate();
+    </script>
+</body>
+
+</html>
