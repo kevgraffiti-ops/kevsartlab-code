@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Vortex Engine</title>
+    <title>Cyber Vortex Hyper-Engine</title>
     <style>
         * {
             box-sizing: border-box;
@@ -18,7 +18,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #000;
+            background-color: #020208;
             font-family: system-ui, sans-serif;
             color: #e0e6ed;
         }
@@ -69,32 +69,33 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            width: 280px;
-            background: rgba(4, 8, 15, 0.92);
-            border: 1px solid rgba(0, 243, 255, 0.35);
-            border-radius: 8px;
-            backdrop-filter: blur(20px);
+            width: 290px;
+            background: rgba(4, 8, 18, 0.85);
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            border-radius: 10px;
+            backdrop-filter: blur(25px);
             z-index: 100;
             display: flex;
             flex-direction: column;
             gap: 12px;
-            padding: 16px;
+            padding: 18px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.15);
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
         #hud-panel.collapsed {
-            transform: translateX(-320px);
+            transform: translateX(-340px);
             opacity: 0;
             pointer-events: none;
         }
 
         .panel-title {
             font-size: 11px;
-            font-weight: 800;
+            font-weight: 900;
             letter-spacing: 2px;
             color: #00f3ff;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            text-shadow: 0 0 8px #00f3ff;
         }
 
         .control-group {
@@ -121,48 +122,52 @@
             appearance: none;
             -webkit-appearance: none;
             width: 100%;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.12);
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
             outline: none;
+            border-radius: 2px;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             background: #00f3ff;
             cursor: pointer;
-            box-shadow: 0 0 10px #00f3ff;
+            box-shadow: 0 0 12px #00f3ff;
         }
 
         select,
         button {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(0, 243, 255, 0.3);
             color: #e0e6ed;
-            padding: 8px 10px;
-            border-radius: 4px;
+            padding: 9px 12px;
+            border-radius: 6px;
             font-size: 11px;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
         select:hover,
         button:hover {
             border-color: #00f3ff;
-            background: rgba(0, 243, 255, 0.15);
+            background: rgba(0, 243, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
         }
 
         .btn-record {
-            background: rgba(255, 50, 80, 0.18);
+            background: rgba(255, 50, 80, 0.2);
             border-color: #ff3355;
             color: #ff3355;
-            font-weight: 700;
         }
 
         .btn-record.recording {
             background: #ff3355;
             color: #fff;
+            box-shadow: 0 0 20px #ff3355;
         }
 
         .toggle-ui-btn {
@@ -170,16 +175,17 @@
             top: 20px;
             left: 20px;
             z-index: 99;
-            background: rgba(4, 8, 15, 0.88);
+            background: rgba(4, 8, 18, 0.85);
             border: 1px solid rgba(0, 243, 255, 0.4);
             color: #00f3ff;
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -190,24 +196,28 @@
     <button class="toggle-ui-btn" id="toggle-ui">⚙️</button>
 
     <div id="hud-panel">
-        <div class="panel-title">CYBER VORTEX ENGINE</div>
+        <div class="panel-title">⚡ HYPER VORTEX CORE</div>
         <div class="control-group">
-            <div class="control-label">ROTATION SPEED <span id="val-speed">1.5</span></div>
-            <input type="range" id="param-speed" min="0.1" max="4.0" step="0.1" value="1.5">
+            <div class="control-label">WARP SPEED <span id="val-speed">2.0</span></div>
+            <input type="range" id="param-speed" min="0.2" max="6.0" step="0.1" value="2.0">
         </div>
         <div class="control-group">
-            <div class="control-label">VORTEX TWIST <span id="val-twist">2.0</span></div>
-            <input type="range" id="param-twist" min="0.5" max="5.0" step="0.1" value="2.0">
+            <div class="control-label">VORTEX TWIST <span id="val-twist">3.5</span></div>
+            <input type="range" id="param-twist" min="0.5" max="8.0" step="0.1" value="3.5">
         </div>
         <div class="control-group">
-            <div class="control-label">CANVAS ASPECT</div>
+            <div class="control-label">CORE SCALE <span id="val-scale">1.8</span></div>
+            <input type="range" id="param-scale" min="0.8" max="3.5" step="0.1" value="1.8">
+        </div>
+        <div class="control-group">
+            <div class="control-label">VIEWPORT ASPECT</div>
             <select id="select-aspect">
                 <option value="aspect-9-16">9:16 Vertical Reel</option>
                 <option value="aspect-1-1">1:1 Square</option>
                 <option value="aspect-16-9">16:9 Widescreen</option>
             </select>
         </div>
-        <button id="btn-record" class="btn-record">⏺ Record WebM Reel</button>
+        <button id="btn-record" class="btn-record">⏺ Record WebM Clip</button>
     </div>
 
     <div id="canvas-container">
@@ -217,11 +227,11 @@
     <script>
         const viewport = document.getElementById('viewport');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020208);
-        scene.fog = new THREE.FogExp2(0x020208, 0.012);
+        scene.background = new THREE.Color(0x020209);
+        scene.fog = new THREE.FogExp2(0x020209, 0.008);
 
-        const camera = new THREE.PerspectiveCamera(60, viewport.clientWidth / viewport.clientHeight, 0.1, 300);
-        camera.position.set(0, 0, 45);
+        const camera = new THREE.PerspectiveCamera(65, viewport.clientWidth / viewport.clientHeight, 0.1, 400);
+        camera.position.set(0, 0, 32);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(viewport.clientWidth, viewport.clientHeight);
@@ -230,31 +240,62 @@
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
-        const ringGroup = new THREE.Group();
-        scene.add(ringGroup);
+        // --- Dynamic Central Energy Core ---
+        const coreGeo = new THREE.IcosahedronGeometry(6, 4);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.85 });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(coreMesh);
 
-        const RING_COUNT = 40;
+        const innerCoreGeo = new THREE.OctahedronGeometry(3.5, 2);
+        const innerCoreMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true, transparent: true, opacity: 0.95 });
+        const innerCoreMesh = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+        scene.add(innerCoreMesh);
+
+        // --- Outer Vortex Tunnel ---
+        const tunnelGroup = new THREE.Group();
+        scene.add(tunnelGroup);
+
+        const RING_COUNT = 70;
         const ringMaterials = [];
 
         for (let i = 0; i < RING_COUNT; i++) {
-            const geo = new THREE.TorusGeometry(8 + i * 0.4, 0.12, 8, 6);
-            const hue = (i * 0.025) % 1.0;
+            const radius = 10 + Math.pow(i * 0.22, 1.4);
+            const geo = new THREE.TorusGeometry(radius, 0.2, 12, 8);
+            const hue = (i * 0.015) % 1.0;
             const mat = new THREE.MeshBasicMaterial({
-                color: new THREE.Color().setHSL(hue, 1.0, 0.5),
+                color: new THREE.Color().setHSL(hue, 1.0, 0.55),
                 wireframe: true,
                 transparent: true,
-                opacity: 0.8
+                opacity: Math.max(0.2, 1 - (i / RING_COUNT))
             });
             ringMaterials.push({ mat, baseHue: hue });
 
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.z = -i * 3;
-            ringGroup.add(mesh);
+            mesh.position.z = -i * 3.5 + 40;
+            tunnelGroup.add(mesh);
         }
 
-        let speed = 1.5;
-        let twist = 2.0;
+        // --- Particle Field ---
+        const particleCount = 1200;
+        const particleGeo = new THREE.BufferGeometry();
+        const particlePos = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i += 3) {
+            particlePos[i] = (Math.random() - 0.5) * 120;
+            particlePos[i + 1] = (Math.random() - 0.5) * 120;
+            particlePos[i + 2] = (Math.random() - 0.5) * 200;
+        }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.4, color: 0x00f3ff, transparent: true, opacity: 0.7 });
+        const particles = new THREE.Points(particleGeo, particleMat);
+        scene.add(particles);
+
+        // --- Parameters ---
+        let speed = 2.0;
+        let twist = 3.5;
+        let scale = 1.8;
 
         document.getElementById('param-speed').addEventListener('input', e => {
             speed = parseFloat(e.target.value);
@@ -263,6 +304,10 @@
         document.getElementById('param-twist').addEventListener('input', e => {
             twist = parseFloat(e.target.value);
             document.getElementById('val-twist').innerText = twist;
+        });
+        document.getElementById('param-scale').addEventListener('input', e => {
+            scale = parseFloat(e.target.value);
+            document.getElementById('val-scale').innerText = scale;
         });
         document.getElementById('toggle-ui').addEventListener('click', () => {
             document.getElementById('hud-panel').classList.toggle('collapsed');
@@ -281,6 +326,7 @@
         }
         window.addEventListener('resize', resize);
 
+        // --- WebM Recorder ---
         let mediaRecorder, chunks = [];
         const recordBtn = document.getElementById('btn-record');
         recordBtn.addEventListener('click', () => {
@@ -296,10 +342,10 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `cyber-vortex-${Date.now()}.webm`;
+                    a.download = `hyper-vortex-${Date.now()}.webm`;
                     a.click();
                     recordBtn.classList.remove('recording');
-                    recordBtn.innerText = '⏺ Record WebM Reel';
+                    recordBtn.innerText = '⏺ Record WebM Clip';
                 };
                 mediaRecorder.start();
                 recordBtn.classList.add('recording');
@@ -312,13 +358,30 @@
             requestAnimationFrame(animate);
             const elapsed = clock.getElapsedTime();
 
-            ringGroup.children.forEach((ring, idx) => {
-                ring.rotation.z = elapsed * speed * 0.5 + idx * (twist * 0.05);
-                ring.rotation.x = Math.sin(elapsed * 0.5 + idx * 0.1) * 0.2;
+            // Animate core
+            coreMesh.rotation.x = elapsed * speed * 0.3;
+            coreMesh.rotation.y = elapsed * speed * 0.5;
+            coreMesh.scale.setScalar(scale + Math.sin(elapsed * 3) * 0.15);
 
-                const currentHue = (ringMaterials[idx].baseHue + elapsed * 0.1) % 1.0;
+            innerCoreMesh.rotation.x = -elapsed * speed * 0.6;
+            innerCoreMesh.rotation.z = elapsed * speed * 0.4;
+
+            // Animate vortex rings
+            tunnelGroup.children.forEach((ring, idx) => {
+                ring.rotation.z = elapsed * speed * 0.4 + idx * (twist * 0.04);
+                ring.rotation.x = Math.sin(elapsed * 0.8 + idx * 0.08) * 0.25;
+
+                const currentHue = (ringMaterials[idx].baseHue + elapsed * 0.12) % 1.0;
                 ringMaterials[idx].mat.color.setHSL(currentHue, 1.0, 0.55);
             });
+
+            // Animate particle drift
+            const positions = particleGeo.attributes.position.array;
+            for (let i = 2; i < particleCount * 3; i += 3) {
+                positions[i] += speed * 0.2;
+                if (positions[i] > 100) positions[i] = -100;
+            }
+            particleGeo.attributes.position.needsUpdate = true;
 
             controls.update();
             renderer.render(scene, camera);
